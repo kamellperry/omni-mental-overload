@@ -2,7 +2,7 @@
 FRONTEND_DIR := apps/api
 BACKEND_DIR := apps/crawler
 
-.PHONY: install.frontend install.backend setup lint.backend format.backend
+.PHONY: install.frontend install.backend setup lint.backend format.backend docker.up
 
 # Install frontend dependencies using bun
 install.frontend:
@@ -24,3 +24,7 @@ lint.backend:
 
 format.backend:
 	cd $(BACKEND_DIR) && uv run ruff format .
+
+# Bring up Docker services using .env.local
+docker.up:
+	docker compose --env-file .env.local up -d
