@@ -2,7 +2,7 @@
 FRONTEND_DIR := apps/api
 BACKEND_DIR := apps/crawler
 
-.PHONY: install.frontend install.backend setup
+.PHONY: install.frontend install.backend setup lint.backend format.backend
 
 # Install frontend dependencies using bun
 install.frontend:
@@ -17,3 +17,10 @@ install.backend:
 # Setup all: frontend + backend
 setup: install.frontend install.backend
 	@echo "Setup complete. Frontend and backend dependencies installed."
+
+# Ruff lint/format for backend (Python)
+lint.backend:
+	cd $(BACKEND_DIR) && uv run ruff check .
+
+format.backend:
+	cd $(BACKEND_DIR) && uv run ruff format .
