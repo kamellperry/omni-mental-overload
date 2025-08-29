@@ -1,6 +1,7 @@
 # Omni MVP Monorepo
 
 Stacks:
+
 - Node API: Bun + Express + Prisma + BullMQ
 - Python Crawler: uv + FastAPI + curl_cffi
 - Infra: Postgres, Redis, optional Ollama, Docker Compose
@@ -23,6 +24,7 @@ uv run fastapi dev app/main.py
 ```
 
 Or run everything via Docker:
+
 ```bash
 docker compose up --build
 ```
