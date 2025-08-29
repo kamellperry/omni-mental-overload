@@ -1,5 +1,12 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
 model Campaign {
   id            String   @id @default(uuid())
@@ -19,8 +26,9 @@ model Lead {
   qualified    Boolean
   reasons      Json
   qualifiedAt  DateTime @default(now())
-  campaign     Campaign @relation(fields: [campaignId], references: [id])
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   @@id([campaignId, username])
+  @@index([campaignId, score])
 }
 
 model Job {
@@ -32,16 +40,19 @@ model Job {
   startedAt   DateTime?
   finishedAt  DateTime?
   errorText   String?
-  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  @@index([campaignId])
+  @@index([status])
 }
 
 model CampaignCandidate {
   campaignId          String
   username            String
   candidateScoreCheap Int
-  updatedAt           DateTime @default(now())
-  campaign            Campaign @relation(fields: [campaignId], references: [id])
+  updatedAt           DateTime @updatedAt
+  campaign            Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   @@id([campaignId, username])
+  @@index([campaignId, candidateScoreCheap])
 }
 
 model LLMScore {
@@ -54,13 +65,14 @@ model LLMScore {
   reasons      Json
   createdAt    DateTime @default(now())
   @@id([campaignId, username, profileHash, criteriaHash])
+  @@index([campaignId])
 }
 
 model ProfileRaw {
   username    String   @id
   payload     Json
   firstSeen   DateTime @default(now())
-  lastSeen    DateTime @default(now())
+  lastSeen    DateTime @updatedAt
   contentHash String
 }
 
@@ -74,5 +86,5 @@ model ProfileFeatures {
   recentActivityAt DateTime?
   features         Json
   versionHash      String
-  updatedAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
