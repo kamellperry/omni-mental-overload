@@ -1,0 +1,78 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+model Campaign {
+  id            String   @id @default(uuid())
+  name          String
+  criteria      Json
+  criteriaHash  String
+  createdAt     DateTime @default(now())
+  leads         Lead[]
+  jobs          Job[]
+  candidates    CampaignCandidate[]
+}
+
+model Lead {
+  campaignId   String
+  username     String
+  score        Int
+  qualified    Boolean
+  reasons      Json
+  qualifiedAt  DateTime @default(now())
+  campaign     Campaign @relation(fields: [campaignId], references: [id])
+  @@id([campaignId, username])
+}
+
+model Job {
+  id          String    @id @default(uuid())
+  campaignId  String?
+  type        String
+  status      String
+  key         String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  errorText   String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+}
+
+model CampaignCandidate {
+  campaignId          String
+  username            String
+  candidateScoreCheap Int
+  updatedAt           DateTime @default(now())
+  campaign            Campaign @relation(fields: [campaignId], references: [id])
+  @@id([campaignId, username])
+}
+
+model LLMScore {
+  campaignId   String
+  username     String
+  profileHash  String
+  criteriaHash String
+  score        Int
+  confidence   Float
+  reasons      Json
+  createdAt    DateTime @default(now())
+  @@id([campaignId, username, profileHash, criteriaHash])
+}
+
+model ProfileRaw {
+  username    String   @id
+  payload     Json
+  firstSeen   DateTime @default(now())
+  lastSeen    DateTime @default(now())
+  contentHash String
+}
+
+model ProfileFeatures {
+  username         String   @id
+  followers        Int
+  engagement       Float?
+  lang             String?
+  country          String?
+  hasLink          Boolean?
+  recentActivityAt DateTime?
+  features         Json
+  versionHash      String
+  updatedAt        DateTime @default(now())
+}
