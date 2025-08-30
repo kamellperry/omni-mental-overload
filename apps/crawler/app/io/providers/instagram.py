@@ -20,6 +20,23 @@ from ..endpoints import (
     INSTAGRAM_HASHTAG_QUERY_HASH,
 )
 
+logger = logging.getLogger("crawler.ig")
+
+def _classify_error(err: BaseException) -> str:
+    msg = str(err).lower()
+    if "http 429" in msg:
+        return "rate_limited"
+    if "http 403" in msg or "http 401" in msg:
+        return "auth_required"
+    if "http 404" in msg:
+        return "not_found"
+    if "timeout" in msg:
+        return "timeout"
+    if "ssl" in msg or "connection" in msg or "conn" in msg:
+        return "connection"
+    if "http 5" in msg:
+        return "server_error"
+    return "unknown"
 
 def _with_params(url: str, params: Dict[str, str]) -> str:
     qs = urlencode(params)
@@ -42,7 +59,11 @@ async def get_web_profile_info(client: HttpClient, username: str) -> Any:
                 pass
     # Fallback to legacy web profile info endpoint
     url = _with_params(INSTAGRAM_WEB_PROFILE_INFO, {"username": username})
-    return await client.get_json(url)
+    try:
+        return await client.get_json(url)
+    except Exception as e:
+        logger.info({"event": "ig.http.error", "url": url, "reason": _classify_error(e)})
+        raise
 
 
 async def get_media_comments(
@@ -60,7 +81,11 @@ async def get_media_comments(
         params["max_id"] = max_id
     if params:
         url = _with_params(url, params)
-    return await client.get_json(url)
+    try:
+        return await client.get_json(url)
+    except Exception as e:
+        logger.info({"event": "ig.http.error", "url": url, "reason": _classify_error(e)})
+        raise
 
 
 async def search_users(client: HttpClient, query: str) -> Any:
@@ -71,12 +96,20 @@ async def search_users(client: HttpClient, query: str) -> Any:
         "include_reel": "true",
     }
     url = _with_params(INSTAGRAM_SEARCH_TOP, params)
-    return await client.get_json(url)
+    try:
+        return await client.get_json(url)
+    except Exception as e:
+        logger.info({"event": "ig.http.error", "url": url, "reason": _classify_error(e)})
+        raise
 
 
 async def get_user_info_by_id(client: HttpClient, user_id: str) -> Any:
     url = INSTAGRAM_USER_INFO_BY_ID.format(user_id=user_id)
-    return await client.get_json(url)
+    try:
+        return await client.get_json(url)
+    except Exception as e:
+        logger.info({"event": "ig.http.error", "url": url, "reason": _classify_error(e)})
+        raise
 
 
 async def media_id_from_shortcode(client: HttpClient, shortcode: str) -> Optional[str]:
@@ -104,7 +137,6 @@ async def media_id_from_shortcode(client: HttpClient, shortcode: str) -> Optiona
         pass
 
     # Optional GraphQL fallback (env only)
-    logger = logging.getLogger("crawler.ig")
     gql_hash = os.getenv("CRAWLER_IG_GQL_SHORTCODE_HASH")
     if _graphql_enabled() and gql_hash:
         try:
@@ -218,7 +250,11 @@ async def list_media_by_tag(client: HttpClient, tag: str, limit: int = 20) -> Li
     # HTML fallback
     try:
         url = f"https://www.instagram.com/explore/tags/{tag}/"
-        ctype, text = await client.get_raw(url)
+        try:
+            ctype, text = await client.get_raw(url)
+        except Exception as e:
+            logger.info({"event": "ig.http.error", "url": url, "reason": _classify_error(e)})
+            return []
         if text and "html" in (ctype or "").lower():
             out: List[Dict[str, str]] = []
             seen = set()
@@ -230,7 +266,8 @@ async def list_media_by_tag(client: HttpClient, tag: str, limit: int = 20) -> Li
                     if len(out) >= limit:
                         break
             return out
-    except Exception:
+    except Exception as e:
+        logger.info({"event": "ig.http.error", "url": f"https://www.instagram.com/explore/tags/{tag}/", "reason": _classify_error(e)})
         return []
     return []
 
@@ -257,7 +294,11 @@ def _get_hash(env_key: str, default: Optional[str] = None) -> Optional[str]:
 async def get_graphql(client: HttpClient, query_hash: str, variables: Dict[str, Any]) -> Any:
     vars_json = json.dumps(variables, separators=(",", ":"), ensure_ascii=False)
     url = f"{INSTAGRAM_GRAPHQL_QUERY}?query_hash={quote(query_hash)}&variables={quote(vars_json)}"
-    return await client.get_json(url)
+    try:
+        return await client.get_json(url)
+    except Exception as e:
+        logger.info({"event": "ig.http.error", "url": url, "reason": _classify_error(e)})
+        raise
 
 def extract_shortcode_from_url(url_or_code: str) -> str:
     """Return shortcode if given a full Instagram URL; otherwise return input.
