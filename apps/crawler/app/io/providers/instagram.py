@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 from typing import Any, Dict, Optional, List
@@ -14,6 +15,8 @@ from ..endpoints import (
     INSTAGRAM_MEDIA_SHORTCODE_WEB,
     INSTAGRAM_MEDIA_SHORTCODE_MOBILE,
     INSTAGRAM_POST_HTML,
+    INSTAGRAM_GRAPHQL_QUERY,
+    INSTAGRAM_HASHTAG_QUERY_HASH,
 )
 
 
@@ -102,11 +105,48 @@ async def media_id_from_shortcode(client: HttpClient, shortcode: str) -> Optiona
 
 
 async def list_media_by_tag(client: HttpClient, tag: str, limit: int = 20) -> List[Dict[str, str]]:
-    """Return a list of media dictionaries with at least `shortcode`.
+    """Return a list of media dicts with at least `shortcode`.
 
-    Prefers JSON from CRAWLER_TAG_URL_TEMPLATE if set. Falls back to
-    scraping https://www.instagram.com/explore/tags/{tag}/ for /p/{shortcode}/ links.
+    Preference order:
+      1) Instagram GraphQL hashtag query (Instaloader-style query hash)
+      2) JSON template via CRAWLER_TAG_URL_TEMPLATE
+      3) HTML tag page scrape for /p/{shortcode}/ links
     """
+    # 1) Try GraphQL hashtag listing (reverse-engineered; may require cookies/UA)
+    try:
+        out: List[Dict[str, str]] = []
+        after: Optional[str] = None
+        page = 0
+        while len(out) < limit and page < 10:  # safety bound
+            variables = {"tag_name": tag, "first": 12}
+            if after:
+                variables["after"] = after
+            url = f"{INSTAGRAM_GRAPHQL_QUERY}?query_hash={INSTAGRAM_HASHTAG_QUERY_HASH}&variables={json.dumps(variables, separators=(',', ':'), ensure_ascii=False)}"
+            data = await client.get_json(url)
+            edges = []
+            if isinstance(data, dict):
+                hashtag = (data.get("data") or {}).get("hashtag") if data.get("data") else None
+                if isinstance(hashtag, dict):
+                    edge = hashtag.get("edge_hashtag_to_media") or {}
+                    edges = edge.get("edges") or []
+                    page_info = edge.get("page_info") or {}
+                    after = page_info.get("end_cursor") if page_info.get("has_next_page") else None
+            for e in edges:
+                if not isinstance(e, dict):
+                    continue
+                node = e.get("node") or {}
+                sc = node.get("shortcode")
+                if isinstance(sc, str):
+                    out.append({"shortcode": sc})
+                    if len(out) >= limit:
+                        break
+            if not edges or not after:
+                break
+            page += 1
+        if out:
+            return out
+    except Exception:
+        pass
     tpl = os.getenv("CRAWLER_TAG_URL_TEMPLATE")
     if tpl:
         try:
