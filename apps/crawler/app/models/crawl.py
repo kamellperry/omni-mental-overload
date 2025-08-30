@@ -4,6 +4,8 @@ from pydantic import BaseModel
 
 class CrawlConfig(BaseModel):
     max_profiles: int = 100
+    max_comments_per_media: int = 200
+    max_media_per_tag: int = 20
     mode: Literal['fake', 'real'] = 'fake'
     request_timeout_s: float = 10.0
     retries: int = 2

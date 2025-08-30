@@ -5,6 +5,8 @@ from .hash import content_hash
 from ..io.db import upsert_profile, get_existing_hash
 from ..io.http_client import HttpClient, fake_fetch, real_fetch
 from .enrich import enrich
+from .post_comments_service import crawl_post_comments
+from .tag_crawl_service import crawl_tag
 
 
 async def run_crawl(seed_type: str, seed_value: str, cfg: Any, pool) -> None:
@@ -19,7 +21,13 @@ async def run_crawl(seed_type: str, seed_value: str, cfg: Any, pool) -> None:
             backoff_s=getattr(cfg, "backoff_s", 0.25),
             per_domain_limit=getattr(cfg, "per_domain_limit", 2),
         )
-        profiles = await real_fetch(seed_type, seed_value, max_profiles, client)
+        if seed_type == "post":
+            profiles = await crawl_post_comments(seed_value, cfg, client)
+        elif seed_type == "tag":
+            profiles = await crawl_tag(seed_value, cfg, client)
+        else:
+            # Fallback for generic URL/user cases using existing path
+            profiles = await real_fetch(seed_type, seed_value, max_profiles, client)
     else:
         profiles = await fake_fetch(seed_type, seed_value, max_profiles)
 

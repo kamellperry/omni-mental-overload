@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import os
 import re
-from typing import Any, Dict, Optional
-from urllib.parse import urlencode
+from typing import Any, Dict, Optional, List
+from urllib.parse import urlencode, urlparse
 
 from ..http_client import HttpClient
 from ..endpoints import (
@@ -100,11 +101,76 @@ async def media_id_from_shortcode(client: HttpClient, shortcode: str) -> Optiona
     return None
 
 
+async def list_media_by_tag(client: HttpClient, tag: str, limit: int = 20) -> List[Dict[str, str]]:
+    """Return a list of media dictionaries with at least `shortcode`.
+
+    Prefers JSON from CRAWLER_TAG_URL_TEMPLATE if set. Falls back to
+    scraping https://www.instagram.com/explore/tags/{tag}/ for /p/{shortcode}/ links.
+    """
+    tpl = os.getenv("CRAWLER_TAG_URL_TEMPLATE")
+    if tpl:
+        try:
+            url = tpl.format(value=tag, tag=tag)
+            data = await client.get_json(url)
+            items: List[Dict[str, Any]] = []
+            if isinstance(data, dict):
+                if isinstance(data.get("items"), list):
+                    items = [x for x in data["items"] if isinstance(x, dict)]  # type: ignore[index]
+                elif isinstance(data.get("media"), list):
+                    items = [x for x in data["media"] if isinstance(x, dict)]  # type: ignore[index]
+            elif isinstance(data, list):
+                items = [x for x in data if isinstance(x, dict)]
+            out: List[Dict[str, str]] = []
+            for it in items:
+                sc = it.get("shortcode") or it.get("code")
+                if isinstance(sc, str):
+                    out.append({"shortcode": sc})
+                    if len(out) >= limit:
+                        break
+            if out:
+                return out
+        except Exception:
+            pass
+
+    # HTML fallback
+    try:
+        url = f"https://www.instagram.com/explore/tags/{tag}/"
+        ctype, text = await client.get_raw(url)
+        if text and "html" in (ctype or "").lower():
+            out: List[Dict[str, str]] = []
+            seen = set()
+            for m in re.finditer(r"/p/([A-Za-z0-9_-]+)/", text):
+                sc = m.group(1)
+                if sc not in seen:
+                    seen.add(sc)
+                    out.append({"shortcode": sc})
+                    if len(out) >= limit:
+                        break
+            return out
+    except Exception:
+        return []
+    return []
+
 __all__ = [
     "get_web_profile_info",
     "get_media_comments",
     "search_users",
     "get_user_info_by_id",
     "media_id_from_shortcode",
+    "list_media_by_tag",
 ]
 
+def extract_shortcode_from_url(url_or_code: str) -> str:
+    """Return shortcode if given a full Instagram URL; otherwise return input.
+
+    Supports /p/{code}/ and /reel/{code}/ URL forms.
+    """
+    if url_or_code.startswith("http://") or url_or_code.startswith("https://"):
+        try:
+            path = urlparse(url_or_code).path or ""
+            m = re.search(r"/(?:p|reel)/([A-Za-z0-9_-]+)/?", path)
+            if m:
+                return m.group(1)
+        except Exception:
+            return url_or_code
+    return url_or_code
