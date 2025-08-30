@@ -5,6 +5,7 @@ import * as jobs from '../features/jobs/job.repo';
 import * as leads from '../features/leads/lead.repo';
 import { createCampaignSchema, discoverSchema, qualifySchema } from '../features/campaigns/campaign.schema';
 import * as campaigns from '../features/campaigns/campaign.service';
+import { registerCampaignQualify, removeCampaignQualify } from '../workers/scheduler';
 
 export const campaignsRouter = Router();
 
@@ -12,6 +13,8 @@ campaignsRouter.post('/', async (req, res, next) => {
   try {
     const body = createCampaignSchema.parse(req.body);
     const campaign = await campaigns.create(body);
+    // Bind per-campaign qualify schedule
+    await registerCampaignQualify(campaign.id);
     res.json(campaign);
   } catch (err) {
     next(err);
