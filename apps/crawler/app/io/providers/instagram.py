@@ -4,7 +4,7 @@ import json
 import os
 import re
 from typing import Any, Dict, Optional, List
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode, urlparse, quote
 
 from ..http_client import HttpClient
 from ..endpoints import (
@@ -29,6 +29,17 @@ def _with_params(url: str, params: Dict[str, str]) -> str:
 
 
 async def get_web_profile_info(client: HttpClient, username: str) -> Any:
+    # Try GraphQL first if enabled and a hash is provided
+    if _graphql_enabled():
+        qh = _get_hash("IG_HASH_USER_BY_USERNAME")
+        if qh:
+            try:
+                data = await get_graphql(client, qh, {"username": username})
+                if isinstance(data, dict) and isinstance((data.get("data") or {}).get("user"), dict):
+                    return data
+            except Exception:
+                pass
+    # Fallback to legacy web profile info endpoint
     url = _with_params(INSTAGRAM_WEB_PROFILE_INFO, {"username": username})
     return await client.get_json(url)
 
@@ -199,6 +210,22 @@ __all__ = [
     "media_id_from_shortcode",
     "list_media_by_tag",
 ]
+
+
+def _graphql_enabled() -> bool:
+    flag = os.getenv("IG_GRAPHQL_ENABLE", "true").strip().lower()
+    return flag not in ("0", "false", "no")
+
+
+def _get_hash(env_key: str, default: Optional[str] = None) -> Optional[str]:
+    val = os.getenv(env_key)
+    return val if val else default
+
+
+async def get_graphql(client: HttpClient, query_hash: str, variables: Dict[str, Any]) -> Any:
+    vars_json = json.dumps(variables, separators=(",", ":"), ensure_ascii=False)
+    url = f"{INSTAGRAM_GRAPHQL_QUERY}?query_hash={quote(query_hash)}&variables={quote(vars_json)}"
+    return await client.get_json(url)
 
 def extract_shortcode_from_url(url_or_code: str) -> str:
     """Return shortcode if given a full Instagram URL; otherwise return input.
