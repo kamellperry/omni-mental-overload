@@ -102,6 +102,9 @@ Env overrides (optional)
 - `CRAWLER_TAG_URL_TEMPLATE` — JSON endpoint for tag media (e.g. `https://api.example.com/tag/{value}`)
 - `CRAWLER_USER_URL_TEMPLATE` — JSON endpoint for user fetch
 - `CRAWLER_REQUEST_TIMEOUT_S`, `CRAWLER_RETRIES`, `CRAWLER_BACKOFF_S`, `CRAWLER_PER_DOMAIN_LIMIT`, `CRAWLER_PROXY`
+- `IG_GRAPHQL_ENABLE` — `true` (default) to allow GraphQL paths; set to `false` to disable
+- `IG_HASH_USER_BY_USERNAME` — optional GraphQL hash for user-by-username (if provided, provider tries GraphQL before legacy endpoint)
+- `CRAWLER_IG_GQL_SHORTCODE_HASH` — optional GraphQL hash used as a fallback to resolve a post `shortcode` → `media_id` (order: web → mobile → GraphQL → HTML)
 
 Logs
 - `crawl.accepted` when a job is queued
@@ -112,3 +115,10 @@ Notes
 - Services only build profile dicts; `core/crawl_service.py` handles content hashing, enrichment, and upserts.
 - No schema changes: we only write to `ProfileRaw` and `ProfileFeatures`.
 
+GraphQL shortcode fallback
+- If `CRAWLER_IG_GQL_SHORTCODE_HASH` is set and GraphQL is enabled, the provider will try:
+  1) web `media/shortcode` endpoint
+  2) mobile `media/shortcode` endpoint
+  3) GraphQL `https://www.instagram.com/graphql/query/?query_hash=$HASH&variables={"shortcode":"CODE"}`
+  4) HTML page regex
+- This path requires valid cookies/UA in `crawl_config.headers` for Instagram.

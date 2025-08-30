@@ -5,6 +5,7 @@ import os
 import re
 from typing import Any, Dict, Optional, List
 from urllib.parse import urlencode, urlparse, quote
+import logging
 
 from ..http_client import HttpClient
 from ..endpoints import (
@@ -101,6 +102,37 @@ async def media_id_from_shortcode(client: HttpClient, shortcode: str) -> Optiona
             return str(data.get("media_id") or data.get("id")) if (data.get("media_id") or data.get("id")) else None
     except Exception:
         pass
+
+    # Optional GraphQL fallback (env only)
+    logger = logging.getLogger("crawler.ig")
+    gql_hash = os.getenv("CRAWLER_IG_GQL_SHORTCODE_HASH")
+    if _graphql_enabled() and gql_hash:
+        try:
+            data = await get_graphql(client, gql_hash, {"shortcode": shortcode})
+            if isinstance(data, dict):
+                node = (data.get("data") or {}).get("shortcode_media") if data.get("data") else None
+                if isinstance(node, dict) and node.get("id"):
+                    logger.info({
+                        "event": "ig.shortcode.graphql",
+                        "used": True,
+                        "shortcode": shortcode,
+                    })
+                    return str(node.get("id"))
+        except Exception:
+            # fall through to HTML
+            logger.info({
+                "event": "ig.shortcode.graphql",
+                "used": False,
+                "shortcode": shortcode,
+                "reason": "error",
+            })
+    else:
+        logger.info({
+            "event": "ig.shortcode.graphql",
+            "used": False,
+            "shortcode": shortcode,
+            "reason": "disabled_or_missing_hash",
+        })
 
     # Fallback to HTML page scrape for id
     try:
