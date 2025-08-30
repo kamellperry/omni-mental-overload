@@ -1,7 +1,7 @@
 import os
 import json
 from typing import Any, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 import asyncpg
 
@@ -46,13 +46,23 @@ async def upsert_profile(
         )
     else:
         await conn.execute(
-            'INSERT INTO "ProfileRaw"(username, payload, "contentHash") VALUES ($1, $2, $3)',
+            'INSERT INTO "ProfileRaw"(username, payload, "contentHash", "lastSeen") VALUES ($1, $2, $3, now())',
             username,
             json.dumps(profile),
             h,
         )
 
     followers = int(profile.get("followers", 0) or 0)
+
+    # Normalize timezone-aware datetimes to naive UTC for timestamp columns
+    def _to_db_ts(dt: Optional[datetime]) -> Optional[datetime]:
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+    recent_activity_at_db = _to_db_ts(recent_activity_at)
     await conn.execute(
         '''INSERT INTO "ProfileFeatures"(username, followers, "hasLink", "recentActivityAt", features, "versionHash")
            VALUES ($1, $2, $3, $4, $5, $6)
@@ -66,7 +76,7 @@ async def upsert_profile(
         username,
         followers,
         has_link,
-        recent_activity_at,
+        recent_activity_at_db,
         json.dumps(features),
         h,
     )
