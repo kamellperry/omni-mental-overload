@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { createQueue } from '../lib/queue';
 import * as jobs from '../features/jobs/job.repo';
 import * as leads from '../features/leads/lead.repo';
-import { createCampaignSchema } from '../features/campaigns/campaign.schema';
+import { createCampaignSchema, discoverSchema, qualifySchema } from '../features/campaigns/campaign.schema';
 import * as campaigns from '../features/campaigns/campaign.service';
 
 export const campaignsRouter = Router();
@@ -16,14 +16,6 @@ campaignsRouter.post('/', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
-
-const discoverSchema = z.object({
-  seed_type: z.enum(['post', 'profile']).default('post'),
-  seed_value: z.string(),
-  crawl_config: z
-    .object({ max_profiles: z.number().int().min(1).max(5000).default(500) })
-    .default({ max_profiles: 500 }),
 });
 
 campaignsRouter.post('/:id/discover', async (req, res, next) => {
@@ -42,13 +34,6 @@ campaignsRouter.post('/:id/discover', async (req, res, next) => {
     next(err);
   }
 });
-
-const qualifySchema = z
-  .object({
-    use_llm: z.boolean().default(true),
-    batch_size: z.number().int().min(1).max(2000).default(200),
-  })
-  .default({ use_llm: true, batch_size: 200 });
 
 campaignsRouter.post('/:id/qualify', async (req, res, next) => {
   try {
@@ -77,4 +62,3 @@ campaignsRouter.get('/:id/leads', async (req, res, next) => {
     next(err);
   }
 });
-
