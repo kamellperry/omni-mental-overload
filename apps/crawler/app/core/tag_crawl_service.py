@@ -18,7 +18,12 @@ async def crawl_tag(tag: str, cfg: CrawlConfig, client: HttpClient) -> List[Dict
     usernames: Set[str] = set()
 
     try:
-        media_items = await ig.list_media_by_tag(client, tag, limit=max_media)
+        media_items = await ig.list_media_by_tag(
+            client,
+            tag,
+            limit=max_media,
+            media_types=getattr(cfg, "media_types", None),
+        )
     except Exception:
         media_items = []
 
@@ -37,4 +42,3 @@ async def crawl_tag(tag: str, cfg: CrawlConfig, client: HttpClient) -> List[Dict
             profiles.append(p)
 
     return profiles
-

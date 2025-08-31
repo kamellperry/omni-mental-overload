@@ -9,7 +9,7 @@ class DummyClient:
 
 @pytest.mark.asyncio
 async def test_crawl_tag_aggregates_and_dedupes(monkeypatch):
-    async def fake_list_media_by_tag(client, tag, limit=20):
+    async def fake_list_media_by_tag(client, tag, limit=20, **_kwargs):
         return [{"shortcode": "AAA"}, {"shortcode": "BBB"}]
 
     async def fake_crawl_post_comments(seed_value, cfg, client):
@@ -37,4 +37,3 @@ async def test_crawl_tag_aggregates_and_dedupes(monkeypatch):
     out = await crawl_tag("builders", cfg, client)  # type: ignore[arg-type]
 
     assert {p["username"] for p in out} == {"alice", "bob", "carl"}
-

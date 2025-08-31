@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Iterable, Set
 from urllib.parse import urlencode, urlparse, quote
 import logging
 
@@ -17,7 +17,6 @@ from ..endpoints import (
     INSTAGRAM_MEDIA_SHORTCODE_MOBILE,
     INSTAGRAM_POST_HTML,
     INSTAGRAM_GRAPHQL_QUERY,
-    INSTAGRAM_HASHTAG_QUERY_HASH,
 )
 
 logger = logging.getLogger("crawler.ig")
@@ -60,9 +59,13 @@ async def get_web_profile_info(client: HttpClient, username: str) -> Any:
     # Fallback to legacy web profile info endpoint
     url = _with_params(INSTAGRAM_WEB_PROFILE_INFO, {"username": username})
     try:
-        return await client.get_json(url)
+        data = await client.get_json(url)
+        return data
     except Exception as e:
-        logger.info({"event": "ig.http.error", "url": url, "reason": _classify_error(e)})
+        from urllib.parse import urlparse as _p
+        u = _p(url)
+        endpoint = f"{u.netloc}{u.path}"
+        logger.info({"event": "ig.http.error", "endpoint": endpoint, "reason": _classify_error(e)})
         raise
 
 
@@ -82,9 +85,13 @@ async def get_media_comments(
     if params:
         url = _with_params(url, params)
     try:
-        return await client.get_json(url)
+        data = await client.get_json(url)
+        return data
     except Exception as e:
-        logger.info({"event": "ig.http.error", "url": url, "reason": _classify_error(e)})
+        from urllib.parse import urlparse as _p
+        u = _p(url)
+        endpoint = f"{u.netloc}{u.path}"
+        logger.info({"event": "ig.http.error", "endpoint": endpoint, "reason": _classify_error(e)})
         raise
 
 
@@ -97,9 +104,13 @@ async def search_users(client: HttpClient, query: str) -> Any:
     }
     url = _with_params(INSTAGRAM_SEARCH_TOP, params)
     try:
-        return await client.get_json(url)
+        data = await client.get_json(url)
+        return data
     except Exception as e:
-        logger.info({"event": "ig.http.error", "url": url, "reason": _classify_error(e)})
+        from urllib.parse import urlparse as _p
+        u = _p(url)
+        endpoint = f"{u.netloc}{u.path}"
+        logger.info({"event": "ig.http.error", "endpoint": endpoint, "reason": _classify_error(e)})
         raise
 
 
@@ -115,9 +126,8 @@ async def get_user_info_by_id(client: HttpClient, user_id: str) -> Any:
 async def media_id_from_shortcode(client: HttpClient, shortcode: str) -> Optional[str]:
     # Try web endpoint
     try:
-        data = await client.get_json(
-            INSTAGRAM_MEDIA_SHORTCODE_WEB.format(shortcode=shortcode)
-        )
+        web_url = INSTAGRAM_MEDIA_SHORTCODE_WEB.format(shortcode=shortcode)
+        data = await client.get_json(web_url)
         if isinstance(data, dict):
             media = data.get("media") or {}
             return str(media.get("id") or data.get("id")) if (media or data.get("id")) else None
@@ -126,9 +136,8 @@ async def media_id_from_shortcode(client: HttpClient, shortcode: str) -> Optiona
 
     # Try mobile endpoint
     try:
-        data = await client.get_json(
-            INSTAGRAM_MEDIA_SHORTCODE_MOBILE.format(shortcode=shortcode)
-        )
+        mob_url = INSTAGRAM_MEDIA_SHORTCODE_MOBILE.format(shortcode=shortcode)
+        data = await client.get_json(mob_url)
         if isinstance(data, dict):
             if "items" in data and data["items"]:
                 return str(data["items"][0].get("id"))
@@ -168,7 +177,8 @@ async def media_id_from_shortcode(client: HttpClient, shortcode: str) -> Optiona
 
     # Fallback to HTML page scrape for id
     try:
-        ctype, text = await client.get_raw(INSTAGRAM_POST_HTML.format(shortcode=shortcode))
+        url_html = INSTAGRAM_POST_HTML.format(shortcode=shortcode)
+        ctype, text = await client.get_raw(url_html)
         if text and "html" in (ctype or "").lower():
             for pattern in (r'"media_id":"(\d+)"', r'"id":"(\d+)"', r'"pk":"(\d+)"'):
                 m = re.search(pattern, text)
@@ -179,7 +189,33 @@ async def media_id_from_shortcode(client: HttpClient, shortcode: str) -> Optiona
     return None
 
 
-async def list_media_by_tag(client: HttpClient, tag: str, limit: int = 20) -> List[Dict[str, str]]:
+def _normalize_media_types(media_types: Optional[Iterable[str]]) -> Set[str]:
+    if not media_types:
+        return {"post", "reel"}
+    out: Set[str] = set()
+    for x in media_types:
+        s = str(x).strip().lower()
+        if s in ("reel", "reels", "clip", "clips"):
+            out.add("reel")
+        elif s in ("post", "posts"):
+            out.add("post")
+    return out or {"post", "reel"}
+
+
+def _classify_type_from_node(node: Dict[str, Any]) -> str:
+    # For GraphQL nodes, reels are product_type == 'clips'
+    pt = node.get("product_type")
+    if isinstance(pt, str) and pt.lower() == "clips":
+        return "reel"
+    return "post"
+
+
+async def list_media_by_tag(
+    client: HttpClient,
+    tag: str,
+    limit: int = 20,
+    media_types: Optional[Iterable[str]] = None,
+) -> List[Dict[str, str]]:
     """Return a list of media dicts with at least `shortcode`.
 
     Preference order:
@@ -187,41 +223,49 @@ async def list_media_by_tag(client: HttpClient, tag: str, limit: int = 20) -> Li
       2) JSON template via CRAWLER_TAG_URL_TEMPLATE
       3) HTML tag page scrape for /p/{shortcode}/ links
     """
-    # 1) Try GraphQL hashtag listing (reverse-engineered; may require cookies/UA)
-    try:
-        out: List[Dict[str, str]] = []
-        after: Optional[str] = None
-        page = 0
-        while len(out) < limit and page < 10:  # safety bound
-            variables = {"tag_name": tag, "first": 12}
-            if after:
-                variables["after"] = after
-            url = f"{INSTAGRAM_GRAPHQL_QUERY}?query_hash={INSTAGRAM_HASHTAG_QUERY_HASH}&variables={json.dumps(variables, separators=(',', ':'), ensure_ascii=False)}"
-            data = await client.get_json(url)
-            edges = []
-            if isinstance(data, dict):
-                hashtag = (data.get("data") or {}).get("hashtag") if data.get("data") else None
-                if isinstance(hashtag, dict):
-                    edge = hashtag.get("edge_hashtag_to_media") or {}
-                    edges = edge.get("edges") or []
-                    page_info = edge.get("page_info") or {}
-                    after = page_info.get("end_cursor") if page_info.get("has_next_page") else None
-            for e in edges:
-                if not isinstance(e, dict):
-                    continue
-                node = e.get("node") or {}
-                sc = node.get("shortcode")
-                if isinstance(sc, str):
-                    out.append({"shortcode": sc})
-                    if len(out) >= limit:
-                        break
-            if not edges or not after:
-                break
-            page += 1
-        if out:
-            return out
-    except Exception:
-        pass
+    # 1) Try GraphQL hashtag listing (env-only hash; may require cookies/UA)
+    allowed = _normalize_media_types(media_types)
+    gql_hash = os.getenv("CRAWLER_IG_GQL_HASHTAG_HASH")
+    if _graphql_enabled() and gql_hash:
+        try:
+            out: List[Dict[str, str]] = []
+            after: Optional[str] = None
+            page = 0
+            while len(out) < limit and page < 10:  # safety bound
+                variables = {"tag_name": tag, "first": 12}
+                if after:
+                    variables["after"] = after
+                vars_json = json.dumps(variables, separators=(",", ":"), ensure_ascii=False)
+                url = f"{INSTAGRAM_GRAPHQL_QUERY}?query_hash={quote(gql_hash)}&variables={quote(vars_json)}"
+                data = await client.get_json(url)
+                edges = []
+                if isinstance(data, dict):
+                    hashtag = (data.get("data") or {}).get("hashtag") if data.get("data") else None
+                    if isinstance(hashtag, dict):
+                        edge = hashtag.get("edge_hashtag_to_media") or {}
+                        edges = edge.get("edges") or []
+                        page_info = edge.get("page_info") or {}
+                        after = page_info.get("end_cursor") if page_info.get("has_next_page") else None
+                for e in edges:
+                    if not isinstance(e, dict):
+                        continue
+                    node = e.get("node") or {}
+                    # Classify into post/reel and filter by allowed
+                    t = _classify_type_from_node(node)  # "post" or "reel"
+                    if t not in allowed:
+                        continue
+                    sc = node.get("shortcode")
+                    if isinstance(sc, str):
+                        out.append({"shortcode": sc})
+                        if len(out) >= limit:
+                            break
+                if not edges or not after:
+                    break
+                page += 1
+            if out:
+                return out
+        except Exception:
+            pass
     tpl = os.getenv("CRAWLER_TAG_URL_TEMPLATE")
     if tpl:
         try:
@@ -239,6 +283,18 @@ async def list_media_by_tag(client: HttpClient, tag: str, limit: int = 20) -> Li
             for it in items:
                 sc = it.get("shortcode") or it.get("code")
                 if isinstance(sc, str):
+                    # Map provider type fields to post/reel; default to post if unknown
+                    # Known keys: product_type (clips -> reel), media_type (2->reel), is_reel flag
+                    t = "post"
+                    pt = it.get("product_type")
+                    if isinstance(pt, str) and pt.lower() == "clips":
+                        t = "reel"
+                    elif isinstance(it.get("is_reel"), bool) and it.get("is_reel"):
+                        t = "reel"
+                    elif isinstance(it.get("media_type"), (int, float)) and int(it.get("media_type")) == 2:
+                        t = "reel"
+                    if t not in allowed:
+                        continue
                     out.append({"shortcode": sc})
                     if len(out) >= limit:
                         break
@@ -247,27 +303,43 @@ async def list_media_by_tag(client: HttpClient, tag: str, limit: int = 20) -> Li
         except Exception:
             pass
 
-    # HTML fallback
+    # HTML fallback (support both /p/ and /reel/ shortcodes)
     try:
         url = f"https://www.instagram.com/explore/tags/{tag}/"
         try:
             ctype, text = await client.get_raw(url)
         except Exception as e:
-            logger.info({"event": "ig.http.error", "url": url, "reason": _classify_error(e)})
+            from urllib.parse import urlparse as _p
+            u = _p(url)
+            endpoint = f"{u.netloc}{u.path}"
+            logger.info({"event": "ig.http.error", "endpoint": endpoint, "reason": _classify_error(e)})
             return []
         if text and "html" in (ctype or "").lower():
             out: List[Dict[str, str]] = []
             seen = set()
-            for m in re.finditer(r"/p/([A-Za-z0-9_-]+)/", text):
-                sc = m.group(1)
-                if sc not in seen:
-                    seen.add(sc)
-                    out.append({"shortcode": sc})
-                    if len(out) >= limit:
-                        break
+            # Filter by allowed types using path: /p/ => post, /reel/ => reel
+            if "post" in allowed:
+                for m in re.finditer(r"/p/([A-Za-z0-9_-]+)/", text):
+                    sc = m.group(1)
+                    if sc not in seen:
+                        seen.add(sc)
+                        out.append({"shortcode": sc})
+                        if len(out) >= limit:
+                            break
+            if len(out) < limit and "reel" in allowed:
+                for m in re.finditer(r"/reel/([A-Za-z0-9_-]+)/", text):
+                    sc = m.group(1)
+                    if sc not in seen:
+                        seen.add(sc)
+                        out.append({"shortcode": sc})
+                        if len(out) >= limit:
+                            break
             return out
     except Exception as e:
-        logger.info({"event": "ig.http.error", "url": f"https://www.instagram.com/explore/tags/{tag}/", "reason": _classify_error(e)})
+        from urllib.parse import urlparse as _p
+        u = _p(f"https://www.instagram.com/explore/tags/{tag}/")
+        endpoint = f"{u.netloc}{u.path}"
+        logger.info({"event": "ig.http.error", "endpoint": endpoint, "reason": _classify_error(e)})
         return []
     return []
 

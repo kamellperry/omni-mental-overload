@@ -1,5 +1,6 @@
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Literal, Optional, List
 from pydantic import BaseModel
+from pydantic import field_validator
 
 
 class CrawlConfig(BaseModel):
@@ -14,6 +15,36 @@ class CrawlConfig(BaseModel):
     per_domain_limit: int = 2
     proxy: Optional[str] = None
     headers: Optional[Dict[str, str]] = None
+    # Optional media type filter for tag seeds. Defaults to both when empty/missing.
+    media_types: Optional[List[str]] = None
+
+    @field_validator('media_types', mode='before')
+    @classmethod
+    def _normalize_media_types(cls, v: Any) -> Optional[List[str]]:
+        if v is None:
+            return None
+        if isinstance(v, (str,)):
+            vals = [v]
+        elif isinstance(v, (list, tuple)):
+            vals = list(v)
+        else:
+            return None
+        norm: list[str] = []
+        for x in vals:
+            s = str(x).strip().lower()
+            if not s:
+                continue
+            if s in ("reel", "reels", "clip", "clips"):
+                t = "reel"
+            elif s in ("post", "posts"):
+                t = "post"
+            else:
+                # ignore unknowns for compatibility
+                continue
+            if t not in norm:
+                norm.append(t)
+        # Treat empty as None (i.e., both)
+        return norm or None
 
 
 class CrawlRequest(BaseModel):
