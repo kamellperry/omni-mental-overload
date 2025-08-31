@@ -1,8 +1,9 @@
 import { Worker, Job } from 'bullmq';
-import { getConnection } from '../lib/queue';
+import { createQueue, getConnection } from '../lib/queue';
 import { fetchJson } from '../lib/http';
 import { z } from 'zod';
 import * as jobs from '../features/jobs/job.repo';
+import { listEnabled } from '../features/seeds/seed.repo';
 
 const base = process.env.CRAWLER_BASE_URL || 'http://localhost:8000';
 
@@ -20,19 +21,31 @@ export function startCrawlWorker() {
     'crawl',
     async (job: Job) => {
       const { id } = job;
-      const input = payloadSchema.parse(job.data);
       await jobs.markStarted(String(id));
       try {
-        await fetchJson(`${base}/crawl/jobs`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            seed_type: input.seed_type,
-            seed_value: input.seed_value,
-            crawl_config: input.crawl_config,
-          }),
-          timeoutMs: 10000,
-        });
+        if (job.name === 'crawl.refresh.repeat') {
+          const seeds = await listEnabled();
+          const crawlQ = createQueue('crawl');
+          for (const s of seeds) {
+            await crawlQ.add(
+              'crawl.seed',
+              { campaignId: s.campaignId, seed_type: 'post', seed_value: s.value, crawl_config: { max_profiles: 500 } },
+              { removeOnComplete: true, removeOnFail: { age: 86400 } },
+            );
+          }
+        } else {
+          const input = payloadSchema.parse(job.data);
+          await fetchJson(`${base}/crawl/jobs`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              seed_type: input.seed_type,
+              seed_value: input.seed_value,
+              crawl_config: input.crawl_config,
+            }),
+            timeoutMs: 10000,
+          });
+        }
         await jobs.markCompleted(String(id));
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'crawl_failed';
@@ -43,4 +56,3 @@ export function startCrawlWorker() {
     { connection },
   );
 }
-
