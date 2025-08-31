@@ -46,9 +46,8 @@ export async function registerGlobalRepeatables() {
   }
 
   if (process.env.SCHED_ENABLE_CRAWL_REFRESH === 'true') {
-    // Gate until seeds exist — placeholder env until seeds model exists.
-    const seedsReady = process.env.SCHED_CRAWL_SEEDS_READY === 'true';
-    if (seedsReady) {
+    const hasSeeds = await prisma.crawlSeed.count({ where: { enabled: true } });
+    if (hasSeeds > 0) {
       await crawlQ.add(
         'crawl.refresh.repeat',
         {},
@@ -83,7 +82,7 @@ export async function removeCampaignQualify(campaignId: string) {
 }
 
 export async function scheduleAllActiveCampaigns() {
-  const campaigns = await prisma.campaign.findMany({});
+  const campaigns = await prisma.campaign.findMany({ where: { active: true, deletedAt: null } });
   for (const c of campaigns) {
     await registerCampaignQualify(c.id);
   }
