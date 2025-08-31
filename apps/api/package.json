@@ -15,11 +15,14 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:push": "bun db:generate && bun db:migrate",
+    "db:auth:migrate": "prisma migrate dev --schema prisma/auth/schema.prisma",
+    "db:auth:generate": "prisma generate --schema prisma/auth/schema.prisma",
+    "db:auth:studio": "prisma studio --schema prisma/auth/schema.prisma",
     "queue:worker": "bun --watch src/worker.ts"
   },
   "dependencies": {
     "express": "^5.1.0",
-    "@prisma/client": "^5.22.0",
+    "@prisma/client": "^6.15.0",
     "bullmq": "^4.18.3",
     "ioredis": "^5.7.0",
     "zod": "^3.25.76",
