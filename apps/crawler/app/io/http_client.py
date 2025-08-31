@@ -6,6 +6,9 @@ import random
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
+from http.cookies import SimpleCookie
+
+from .http_headers import build_headers
 
 
 DEFAULT_HEADERS: Dict[str, str] = {
@@ -52,6 +55,7 @@ class HttpClient:
         retries: int = 2,
         backoff_s: float = 0.25,
         per_domain_limit: int = 2,
+        cookie_jar: Optional[Dict[str, str]] = None,
     ) -> None:
         self.headers: Dict[str, str] = {**DEFAULT_HEADERS, **(headers or {})}
         self.proxy = proxy
@@ -59,6 +63,8 @@ class HttpClient:
         self.retries = retries
         self.backoff_s = backoff_s
         self.per_domain_limit = max(1, int(per_domain_limit))
+        # In-memory cookie jar for the life of this client instance (job)
+        self.cookie_jar: Dict[str, str] = dict(cookie_jar or {})
 
     async def _acquire_host(self, url: str) -> Optional[asyncio.Semaphore]:
         host = urlparse(url).hostname or ''
@@ -83,15 +89,19 @@ class HttpClient:
                         proxies = None
                         if self.proxy:
                             proxies = {'http': self.proxy, 'https': self.proxy}
+                        # Build host-aware headers per request
+                        req_headers = build_headers(url, self.headers, cookie_jar=self.cookie_jar)
                         r = await s.get(
                             url,
-                            headers=self.headers,
+                            headers=req_headers,
                             timeout=self.timeout_s,
                             proxies=proxies,
                         )
                         # curl_cffi Response mimics requests API
                         if r.status_code >= 400:  # type: ignore[attr-defined]
                             raise RuntimeError(f'HTTP {r.status_code} for {url}')  # type: ignore[attr-defined]
+                        # Update in-memory cookie jar from Set-Cookie if present
+                        self._update_cookies_from_response(r)
                         ctype = r.headers.get('content-type', '')  # type: ignore[attr-defined]
                         if 'json' in ctype:
                             return r.json()  # type: ignore[attr-defined]
@@ -126,14 +136,17 @@ class HttpClient:
                         proxies = None
                         if self.proxy:
                             proxies = {'http': self.proxy, 'https': self.proxy}
+                        req_headers = build_headers(url, self.headers, cookie_jar=self.cookie_jar)
                         r = await s.get(
                             url,
-                            headers=self.headers,
+                            headers=req_headers,
                             timeout=self.timeout_s,
                             proxies=proxies,
                         )
                         if r.status_code >= 400:  # type: ignore[attr-defined]
                             raise RuntimeError(f'HTTP {r.status_code} for {url}')  # type: ignore[attr-defined]
+                        # Update cookie jar
+                        self._update_cookies_from_response(r)
                         ctype = r.headers.get('content-type', '')  # type: ignore[attr-defined]
                         text = r.text  # type: ignore[attr-defined]
                         return ctype, text
@@ -149,6 +162,34 @@ class HttpClient:
         if last_err is not None:
             raise RuntimeError(f'GET failed after retries: {url}') from last_err
         return '', ''
+
+    def _update_cookies_from_response(self, response: Any) -> None:
+        """Parse Set-Cookie header(s) and update cookie_jar.
+
+        Keeps only cookie name/value pairs; does not persist to disk.
+        """
+        try:
+            set_cookie = response.headers.get('set-cookie')  # type: ignore[attr-defined]
+        except Exception:
+            set_cookie = None
+        if not set_cookie:
+            return
+        try:
+            sc = SimpleCookie()
+            sc.load(set_cookie)
+            for k, morsel in sc.items():
+                self.cookie_jar[k] = morsel.value
+        except Exception:
+            # Best-effort: try naive parse of first segment
+            parts = [p.strip() for p in str(set_cookie).split('\n') if p.strip()]
+            for p in parts:
+                if ';' in p:
+                    first = p.split(';', 1)[0]
+                else:
+                    first = p
+                if '=' in first:
+                    k, v = first.split('=', 1)
+                    self.cookie_jar[k.strip()] = v.strip()
 
 
 def _extract_items(data: Any) -> List[Dict[str, Any]]:

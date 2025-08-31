@@ -31,6 +31,11 @@ INSTAGRAM_ACCOUNTS_EDIT: Final[str] = (
     "https://www.instagram.com/accounts/edit/"
 )
 
+# Instagram GraphQL (reverse-engineered; hashes can change)
+INSTAGRAM_GRAPHQL_QUERY: Final[str] = "https://www.instagram.com/graphql/query/"
+# Hashtag media listing hash commonly used by tools like Instaloader
+INSTAGRAM_HASHTAG_QUERY_HASH: Final[str] = "9b498c08113f1e09617a1703c22b2f32"
+
 
 __all__ = [
     "INSTAGRAM_WEB_PROFILE_INFO",
@@ -41,5 +46,6 @@ __all__ = [
     "INSTAGRAM_MEDIA_SHORTCODE_MOBILE",
     "INSTAGRAM_POST_HTML",
     "INSTAGRAM_ACCOUNTS_EDIT",
+    "INSTAGRAM_GRAPHQL_QUERY",
+    "INSTAGRAM_HASHTAG_QUERY_HASH",
 ]
-
