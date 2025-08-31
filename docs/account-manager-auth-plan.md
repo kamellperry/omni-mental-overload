@@ -1,11 +1,13 @@
 # Account Manager (Auth DB) — Design and Usage
 
 ## Overview
+
 - Separate Postgres database `omni_auth` for auth/session data (cookies, headers, user-agent).
 - Access limited to `apps/api`; the crawler remains stateless and does not connect to the auth DB.
 - No encryption yet. Short-lived Redis cache for session payloads.
 
 ## Schema
+
 - Prisma schema: `apps/api/prisma/auth/schema.prisma`
 - Model `AuthSession`:
   - `id`, `platform`, `account`, `host`, `userAgent`, `headers` (Json), `cookieJar` (Json),
@@ -14,12 +16,14 @@
 - Exactly one active session per `[platform, account, host]` is enforced in the service via transaction.
 
 ## Env Vars
+
 - `AUTH_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/omni_auth`
 - `AUTH_SERVICE_API_KEY=strong-service-key`
 - `SCHED_ENABLE_AUTH_PURGE=true`
 - `SCHED_AUTH_PURGE_EVERY_MS=900000`
 
 ## Endpoints (admin/service-only)
+
 All endpoints require `Authorization: Bearer ${AUTH_SERVICE_API_KEY}`.
 
 - `POST /accounts/sessions`
@@ -36,18 +40,22 @@ All endpoints require `Authorization: Bearer ${AUTH_SERVICE_API_KEY}`.
   - Deletes expired sessions (worker also handles this periodically).
 
 ## Caching
+
 - Redis key: `account:<platform>:<account>:<host>` (TTL ~5m with jitter).
 - Implemented at `apps/api/src/features/accounts/account.cache.ts`.
 
 ## Workers
+
 - Auth purge worker repeats every 15 minutes (configurable via env).
 - Implementation at `apps/api/src/workers/auth-purge.worker.ts` and wired in `apps/api/src/workers/index.ts`.
 
 ## Migration Path
+
 - `lib/pydoll.ts` remains as a temporary fallback and may be gated by a feature flag later.
 - The orchestrator (API) can attach headers/cookies/UA to crawl jobs; the crawler stays stateless.
 
 ## Dev Notes
+
 1. Create DB: `CREATE DATABASE omni_auth;`
 2. Prisma (auth):
    - `bunx prisma migrate dev --schema apps/api/prisma/auth/schema.prisma`
@@ -57,7 +65,7 @@ All endpoints require `Authorization: Bearer ${AUTH_SERVICE_API_KEY}`.
 5. Do not log cookies/headers; errors are masked.
 
 ## Future Work
+
 - Add field-level encryption and/or KMS integration.
 - Add quotas, health checks, and audit logs.
 - Consider a partial unique index for "one active per identity" via raw SQL migration.
-
