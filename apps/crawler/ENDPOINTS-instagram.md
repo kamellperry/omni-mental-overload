@@ -3,7 +3,7 @@
 Purpose: quick reference to the key Instagram endpoints and patterns we rely on for tags, posts, reels, comments, and discovery. No code – just a guide for future engineers.
 
 Notes up front
-- Most web endpoints require valid session cookies and browser-like headers. Bring your own cookies via `crawl_config.headers` (preferably sourced from PyDoll).
+- Most web endpoints require valid session cookies and browser-like headers. Bring your own cookies via `crawl_config.headers`.
 - GraphQL `query_hash` and `doc_id` values can change. Treat them as env-configurable, not hard‑coded business logic.
 - Our crawler already has timeouts, retries with jitter, and per‑domain concurrency caps. Use them.
 
@@ -89,11 +89,6 @@ Typical headers (examples; expect to tune per host):
 - `Accept: application/json`
 
 For mobile endpoints (`i.instagram.com`), a mobile UA or specific app headers may work better. Instaloader chooses headers based on host.
-
-Source of headers in our system
-- Orchestrator fetches `User-Agent`, `Cookie`, and platform tokens from PyDoll and injects into `crawl_config.headers`.
-- The crawler adds host-aware defaults only for `www.instagram.com` (e.g., `Referer`, `Origin`, `X-Requested-With`, `x-ig-app-id` if missing) and mirrors `csrftoken` to `X-CSRFToken` when absent.
-- Cookies and tokens are never logged by the crawler.
 
 ## Rate Limits & Safety
 

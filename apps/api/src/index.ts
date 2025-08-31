@@ -27,7 +27,7 @@ app.post('/campaigns', async (req, res) => {
 app.post('/campaigns/:id/discover', async (req, res) => {
   const { id } = req.params;
   const body = z.object({
-    seed_type: z.enum(['post','profile']).default('post'),
+    seed_type: z.enum(['post','profile','tag']).default('post'),
     seed_value: z.string(),
     crawl_config: z.object({ max_profiles: z.number().int().min(1).max(5000).default(500) }).default({ max_profiles: 500 })
   }).parse(req.body);
