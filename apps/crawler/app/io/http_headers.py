@@ -83,10 +83,11 @@ def build_headers(
         headers.setdefault("X-Requested-With", "XMLHttpRequest")
         headers.setdefault("Origin", "https://www.instagram.com")
         headers.setdefault("Referer", "https://www.instagram.com/")
+        # Optionally set Instagram web app id if not present
+        headers.setdefault("x-ig-app-id", "936619743392459")
     # Mobile host: avoid web-only headers (no-op)
 
     return headers
 
 
 __all__ = ["build_headers"]
-

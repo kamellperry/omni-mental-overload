@@ -80,6 +80,15 @@ curl -X POST http://localhost:8000/crawl/jobs \
   }'
 ```
 
+Auth via PyDoll (recommended)
+- In production, headers should come from a headful session manager (PyDoll).
+- The orchestrator fetches host-ready headers per platform/account and injects them into `crawl_config.headers`.
+- The crawler preserves all tokens and adds host-aware defaults only for `www.instagram.com` (e.g., `Referer`, `Origin`, `X-Requested-With`, and `x-ig-app-id` if missing). It never performs login or stores secrets.
+
+Expected IG header shape from PyDoll (example):
+`{"User-Agent":"Mozilla/5.0 ...","Cookie":"sessionid=...; csrftoken=...; ds_user_id=...; mid=...; ig_did=...","X-CSRFToken":"...","X-IG-WWW-Claim":"...","X-ASBD-ID":"...","X-Instagram-AJAX":"...","x-ig-app-id":"936619743392459"}`
+
+
 Where data is stored
 - Table `"ProfileRaw"`: `username` (PK), `payload` (raw JSON), `contentHash`, `lastSeen`
 - Table `"ProfileFeatures"`: `username` (PK), `followers`, `hasLink`, `recentActivityAt`, `features` (JSON), `versionHash`, `updatedAt`
