@@ -14,9 +14,12 @@ model Campaign {
   criteria      Json
   criteriaHash  String
   createdAt     DateTime @default(now())
+  active        Boolean  @default(true)
+  deletedAt     DateTime?
   leads         Lead[]
   jobs          Job[]
   candidates    CampaignCandidate[]
+  seeds         CrawlSeed[]
 }
 
 model Lead {
@@ -87,4 +90,23 @@ model ProfileFeatures {
   features         Json
   versionHash      String
   updatedAt        DateTime @updatedAt
+}
+
+enum SeedType {
+  post
+}
+
+model CrawlSeed {
+  id         String   @id @default(uuid())
+  campaignId String
+  type       SeedType
+  value      String
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([enabled])
 }

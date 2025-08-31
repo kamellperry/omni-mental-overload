@@ -8,3 +8,7 @@ export const create = async (input: CreateCampaignInput) => {
   return repo.createCampaign(input.name, input.criteria, criteriaHash);
 };
 
+export const activate = async (id: string) => repo.setActive(id, true);
+export const deactivate = async (id: string) => repo.setActive(id, false);
+export const softDelete = async (id: string) => repo.softDelete(id);
+export const restore = async (id: string) => repo.restore(id);
