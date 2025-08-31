@@ -43,7 +43,7 @@ Routers import feature barrels only. Features depend on db and lib. Workers reus
 
 ### Type and validation
 
-* Enable strict mode. No `any`. Allow `unknown` at boundaries.
+* Enable strict mode. ABSOLUTELY NO `any`. Allow `unknown` at boundaries.
 * Validate all inputs with Zod. Derive types from schemas.
 * Use discriminated unions for state machines.
 * Narrow errors with custom error classes.

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+<<<<<<< HEAD
 import { Worker, QueueScheduler, Queue, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { PrismaClient } from '@prisma/client';
@@ -73,3 +74,6 @@ new Worker('qualify', async (job: Job) => {
 new Worker('dispatch', async (job: Job) => {
   console.log('dispatch job', job.id);
 }, { connection });
+=======
+import './workers/index';
+>>>>>>> dev
