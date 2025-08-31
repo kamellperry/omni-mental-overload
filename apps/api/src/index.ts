@@ -4,6 +4,7 @@ import { campaignsRouter } from './http/campaigns.router';
 import { jobsRouter } from './http/jobs.router';
 import { healthRouter } from './http/health.router';
 import { errorMiddleware } from './lib/errors';
+import { accountsRouter } from './http/accounts.router';
 
 const app = express();
 app.use(express.json());
@@ -11,6 +12,7 @@ app.use(express.json());
 app.use('/health', healthRouter);
 app.use('/campaigns', campaignsRouter);
 app.use('/jobs', jobsRouter);
+app.use('/accounts', accountsRouter);
 
 app.use(errorMiddleware);
 
