@@ -53,15 +53,39 @@ async function withTimeout<T>(p: Promise<T>): Promise<T> {
   ]);
 }
 
+function isRecordStringString(v: unknown): v is Record<string, string> {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
+  for (const val of Object.values(v as Record<string, unknown>)) {
+    if (typeof val !== 'string') return false;
+  }
+  return true;
+}
+
+function isRecordUnknown(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function isRecordUnknownArray(v: unknown): v is Array<Record<string, unknown>> {
+  return Array.isArray(v) && v.every((e) => isRecordUnknown(e));
+}
+
 function toOutput(rec: repo.AuthSessionRecord): SessionOutput {
+  const headers: Record<string, string> = isRecordStringString(rec.headers) ? rec.headers : {};
+  const cookieJar: Record<string, unknown> | Array<Record<string, unknown>> =
+    isRecordUnknown(rec.cookieJar)
+      ? rec.cookieJar
+      : isRecordUnknownArray(rec.cookieJar)
+        ? rec.cookieJar
+        : [];
+
   return {
     id: rec.id,
     platform: rec.platform,
     account: rec.account,
     host: rec.host,
     userAgent: rec.userAgent,
-    headers: rec.headers as Record<string, string>,
-    cookieJar: rec.cookieJar as Record<string, unknown> | unknown[],
+    headers,
+    cookieJar,
     status: rec.status,
     createdAt: new Date(rec.createdAt),
     updatedAt: new Date(rec.updatedAt),
@@ -153,4 +177,3 @@ export async function purgeExpired(deps: Deps): Promise<number> {
   const count = await withTimeout(withRetries(() => repo.purgeExpired(now)));
   return count;
 }
-

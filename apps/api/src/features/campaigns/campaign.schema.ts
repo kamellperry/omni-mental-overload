@@ -1,9 +1,16 @@
 import { z } from 'zod';
 import type { Prisma } from '../../generated/prisma/client';
 
-// Prisma.InputJsonValue excludes JS null; use Prisma.JsonNull sentinel if needed at call sites.
-export const jsonValueSchema: z.ZodType<Prisma.InputJsonValue> = z.lazy(() =>
-  z.union([z.string(), z.number(), z.boolean(), z.array(jsonValueSchema), z.record(jsonValueSchema)]),
+// Recursive JSON-like type compatible with Prisma JSON at the edges.
+type Jsonish = string | number | boolean | { [k: string]: Jsonish } | Jsonish[];
+export const jsonValueSchema: z.ZodType<Jsonish> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.array(jsonValueSchema),
+    z.record(z.string(), jsonValueSchema),
+  ]),
 );
 
 export const createCampaignSchema = z.object({

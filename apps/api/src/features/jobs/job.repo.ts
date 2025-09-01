@@ -12,10 +12,10 @@ export const createJob = async (data: {
   return prisma.job.create({
     data: {
       id: data.id,
-      campaignId: data.campaignId,
       type: data.type,
       status: data.status ?? 'queued',
-      key: data.key,
+      ...(data.campaignId !== undefined ? { campaignId: data.campaignId } : {}),
+      ...(data.key !== undefined ? { key: data.key } : {}),
     },
   });
 };

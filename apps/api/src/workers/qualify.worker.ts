@@ -3,6 +3,7 @@ import { getConnection } from '../lib/queue';
 import * as jobs from '../features/jobs/job.repo';
 import { z } from 'zod';
 import { refreshForCampaign } from '../features/candidates/candidate.service';
+import { runQualification } from '../features/qualification/qualification.service';
 
 const payloadSchema = z.object({
   campaignId: z.string().min(1),
@@ -22,8 +23,10 @@ export function startQualifyWorker() {
       try {
         // Ensure campaign_candidates is fresh before shortlist/LLM
         await refreshForCampaign(input.campaignId);
-        // TODO: shortlist, cache by hashes, call LLM, write leads.
-        void input; // silence unused for now
+        // Run qualification with LLM
+        const stats = await runQualification({ campaignId: input.campaignId, batchSize: input.batch_size });
+        // eslint-disable-next-line no-console
+        console.log('[qualify]', { jobId: String(id), campaignId: input.campaignId, ...stats });
         await jobs.markCompleted(String(id));
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'qualify_failed';
