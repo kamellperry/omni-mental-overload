@@ -43,10 +43,26 @@ Routers import feature barrels only. Features depend on db and lib. Workers reus
 
 ### Type and validation
 
-* Enable strict mode. ABSOLUTELY NO `any`. Allow `unknown` at boundaries.
-* Validate all inputs with Zod. Derive types from schemas.
-* Use discriminated unions for state machines.
-* Narrow errors with custom error classes.
+- Strict TypeScript. Absolutely no `any` — ever. Prefer `unknown` at boundaries and immediately refine via Zod or type guards.
+- Validate all inputs with Zod and derive types from schemas (no redundant interfaces for request payloads).
+- Use discriminated unions for state machines and explicit result types for services.
+- Narrow errors with custom error classes.
+
+#### No-Any Policy (enforced)
+
+- Banned: `any`, unchecked casts, and `// @ts-ignore` without explanation.
+- Allowed: `unknown` at the edge, immediately parsed/refined.
+- Named interfaces: Return types must be named interfaces instead of inline `Promise<{ ... }>` shapes for service/repo APIs.
+- Lint rules (see apps/api/eslint.config.js):
+  - `@typescript-eslint/no-explicit-any`: error
+  - `@typescript-eslint/consistent-type-imports`: error
+  - `@typescript-eslint/ban-ts-comment`: error (allows `ts-ignore` only with a description)
+  - Type-aware safety rules enabled (no-unsafe-*, restrict-template-expressions)
+
+#### TS config (apps/api/tsconfig.json)
+
+- `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`, `noImplicitOverride: true`.
+- Keep changes local to feature modules; do not rely on ambient types.
 
 ### Style
 

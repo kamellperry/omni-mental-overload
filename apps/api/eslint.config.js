@@ -17,6 +17,10 @@ export default [
       ecmaVersion: 'latest',
       sourceType: 'module',
       parser: tsParser,
+      parserOptions: {
+        project: ['./tsconfig.json'],
+        tsconfigRootDir: process.cwd(),
+      },
     },
     plugins: { '@typescript-eslint': tsPlugin },
     rules: {
@@ -24,7 +28,21 @@ export default [
       ...prettierConfig.rules,
       'no-undef': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        { 'ts-ignore': 'allow-with-description' }
+      ],
+      // Type-aware safety rules
+      '@typescript-eslint/no-unsafe-assignment': 'error',
+      '@typescript-eslint/no-unsafe-member-access': 'error',
+      '@typescript-eslint/no-unsafe-argument': 'error',
+      '@typescript-eslint/no-unsafe-call': 'error',
+      '@typescript-eslint/restrict-template-expressions': [
+        'error',
+        { allowNumber: true, allowBoolean: true }
+      ],
     },
   },
 ];
-
