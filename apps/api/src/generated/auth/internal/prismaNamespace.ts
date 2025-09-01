@@ -663,7 +663,7 @@ export type Datasource = {
   url?: string
 }
 export type Datasources = {
-  db?: Datasource
+  auth?: Datasource
 }
 
 export const defineExtension = runtime.Extensions.defineExtension as unknown as runtime.Types.Extensions.ExtendsHook<"define", TypeMapCb, runtime.Types.Extensions.DefaultArgs>

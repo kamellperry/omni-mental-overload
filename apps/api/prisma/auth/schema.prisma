@@ -1,9 +1,9 @@
-generator client {
+generator authClient {
   provider = "prisma-client"
   output   = "../../src/generated/auth"
 }
 
-datasource db {
+datasource auth {
   provider = "postgresql"
   url      = env("AUTH_DATABASE_URL")
 }
@@ -14,17 +14,17 @@ enum AuthStatus {
 }
 
 model AuthSession {
-  id         String     @id @default(uuid())
-  platform   String
-  account    String
-  host       String
-  userAgent  String
-  headers    Json
-  cookieJar  Json
-  status     AuthStatus @default(active)
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  expiresAt  DateTime
+  id        String     @id @default(uuid())
+  platform  String
+  account   String
+  host      String
+  userAgent String
+  headers   Json
+  cookieJar Json
+  status    AuthStatus @default(active)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  expiresAt DateTime
 
   @@index([platform, account, host])
   @@index([platform, account, host, status])

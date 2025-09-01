@@ -16,13 +16,13 @@ import type * as Prisma from "./prismaNamespace"
 
 const config: runtime.GetPrismaClientConfig = {
   "generator": {
-    "name": "client",
+    "name": "authClient",
     "provider": {
       "fromEnvVar": null,
       "value": "prisma-client"
     },
     "output": {
-      "value": "/Users/yob/Desktop2/Crawler_Mental_Overload/omni-mental-overload/apps/api/src/generated/auth",
+      "value": "/Users/kamell/Documents/Software_Projects/Work/omni/Experiments/omni-mvp-monorepo/apps/api/src/generated/auth",
       "fromEnvVar": null
     },
     "config": {
@@ -36,27 +36,27 @@ const config: runtime.GetPrismaClientConfig = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/Users/yob/Desktop2/Crawler_Mental_Overload/omni-mental-overload/apps/api/prisma/auth/schema.prisma",
+    "sourceFilePath": "/Users/kamell/Documents/Software_Projects/Work/omni/Experiments/omni-mvp-monorepo/apps/api/prisma/auth/schema.prisma",
     "isCustomOutput": true
   },
   "relativePath": "../../../prisma/auth",
   "clientVersion": "6.15.0",
   "engineVersion": "85179d7826409ee107a6ba334b5e305ae3fba9fb",
   "datasourceNames": [
-    "db"
+    "auth"
   ],
   "activeProvider": "postgresql",
   "postinstall": false,
   "inlineDatasources": {
-    "db": {
+    "auth": {
       "url": {
         "fromEnvVar": "AUTH_DATABASE_URL",
         "value": null
       }
     }
   },
-  "inlineSchema": "generator client {\n  provider = \"prisma-client\"\n  output   = \"../../src/generated/auth\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n  url      = env(\"AUTH_DATABASE_URL\")\n}\n\nenum AuthStatus {\n  active\n  revoked\n}\n\nmodel AuthSession {\n  id        String     @id @default(uuid())\n  platform  String\n  account   String\n  host      String\n  userAgent String\n  headers   Json\n  cookieJar Json\n  status    AuthStatus @default(active)\n  createdAt DateTime   @default(now())\n  updatedAt DateTime   @updatedAt\n  expiresAt DateTime\n\n  @@index([platform, account, host])\n  @@index([platform, account, host, status])\n  @@index([expiresAt])\n  @@index([account])\n}\n",
-  "inlineSchemaHash": "8112a535f23513a6c4b22295c6bc9e0968711472bfbb728221881f98a96ed7d6",
+  "inlineSchema": "generator authClient {\n  provider = \"prisma-client\"\n  output   = \"../../src/generated/auth\"\n}\n\ndatasource auth {\n  provider = \"postgresql\"\n  url      = env(\"AUTH_DATABASE_URL\")\n}\n\nenum AuthStatus {\n  active\n  revoked\n}\n\nmodel AuthSession {\n  id        String     @id @default(uuid())\n  platform  String\n  account   String\n  host      String\n  userAgent String\n  headers   Json\n  cookieJar Json\n  status    AuthStatus @default(active)\n  createdAt DateTime   @default(now())\n  updatedAt DateTime   @updatedAt\n  expiresAt DateTime\n\n  @@index([platform, account, host])\n  @@index([platform, account, host, status])\n  @@index([expiresAt])\n  @@index([account])\n}\n",
+  "inlineSchemaHash": "93774552b5b5324abc59d5902f1c7959848acf447b09b94c297c3e2539df3adc",
   "copyEngine": true,
   "runtimeDataModel": {
     "models": {},

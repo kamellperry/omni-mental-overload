@@ -14,7 +14,7 @@ export const createCampaignSchema = z.object({
 export type CreateCampaignInput = z.infer<typeof createCampaignSchema>;
 
 export const discoverSchema = z.object({
-  seed_type: z.enum(['post', 'profile']).default('post'),
+  seed_type: z.enum(['post', 'hashtag']).default('post'),
   seed_value: z.string(),
   crawl_config: z
     .object({ max_profiles: z.number().int().min(1).max(5000).default(500) })

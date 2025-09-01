@@ -2,6 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { getConnection } from '../lib/queue';
 import * as jobs from '../features/jobs/job.repo';
 import { z } from 'zod';
+import { refreshForCampaign } from '../features/candidates/candidate.service';
 
 const payloadSchema = z.object({
   campaignId: z.string().min(1),
@@ -19,6 +20,8 @@ export function startQualifyWorker() {
       const input = payloadSchema.parse(job.data);
       await jobs.markStarted(String(id));
       try {
+        // Ensure campaign_candidates is fresh before shortlist/LLM
+        await refreshForCampaign(input.campaignId);
         // TODO: shortlist, cache by hashes, call LLM, write leads.
         void input; // silence unused for now
         await jobs.markCompleted(String(id));
@@ -31,4 +34,3 @@ export function startQualifyWorker() {
     { connection },
   );
 }
-

@@ -13,6 +13,7 @@
     "format:check": "prettier --check .",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
+    "db:generate:all": "bun run db:generate && bun run db:auth:generate",
     "db:studio": "prisma studio",
     "db:push": "bun db:generate && bun db:migrate",
     "db:auth:migrate": "prisma migrate dev --schema prisma/auth/schema.prisma",
