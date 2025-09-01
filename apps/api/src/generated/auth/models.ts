@@ -8,12 +8,4 @@
  * 🟢 You can import this file directly.
  */
 export type * from './models/AuthSession'
-export type * from './models/Campaign'
-export type * from './models/Lead'
-export type * from './models/Job'
-export type * from './models/CampaignCandidate'
-export type * from './models/LLMScore'
-export type * from './models/ProfileRaw'
-export type * from './models/ProfileFeatures'
-export type * from './models/CrawlSeed'
 export type * from './commonInputTypes'
