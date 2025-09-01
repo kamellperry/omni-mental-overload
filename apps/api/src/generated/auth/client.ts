@@ -46,6 +46,49 @@ path.join(process.cwd(), "src/generated/auth/libquery_engine-darwin-arm64.dylib.
  * 
  */
 export type AuthSession = Prisma.AuthSessionModel
+/**
+ * Model Campaign
+ * 
+ */
+export type Campaign = Prisma.CampaignModel
+/**
+ * Model Lead
+ * 
+ */
+export type Lead = Prisma.LeadModel
+/**
+ * Model Job
+ * 
+ */
+export type Job = Prisma.JobModel
+/**
+ * Model CampaignCandidate
+ * 
+ */
+export type CampaignCandidate = Prisma.CampaignCandidateModel
+/**
+ * Model LLMScore
+ * 
+ */
+export type LLMScore = Prisma.LLMScoreModel
+/**
+ * Model ProfileRaw
+ * 
+ */
+export type ProfileRaw = Prisma.ProfileRawModel
+/**
+ * Model ProfileFeatures
+ * 
+ */
+export type ProfileFeatures = Prisma.ProfileFeaturesModel
+/**
+ * Model CrawlSeed
+ * 
+ */
+export type CrawlSeed = Prisma.CrawlSeedModel
 
 export type AuthStatus = $Enums.AuthStatus
 export const AuthStatus = $Enums.AuthStatus
+
+export type SeedType = $Enums.SeedType
+export const SeedType = $Enums.SeedType

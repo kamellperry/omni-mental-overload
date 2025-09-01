@@ -14,3 +14,10 @@ export const AuthStatus = {
 } as const
 
 export type AuthStatus = (typeof AuthStatus)[keyof typeof AuthStatus]
+
+
+export const SeedType = {
+  post: 'post'
+} as const
+
+export type SeedType = (typeof SeedType)[keyof typeof SeedType]
