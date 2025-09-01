@@ -9,17 +9,18 @@ datasource db {
 }
 
 model Campaign {
-  id           String              @id @default(uuid())
-  name         String
-  criteria     Json
-  criteriaHash String
-  createdAt    DateTime            @default(now())
-  active       Boolean             @default(true)
-  deletedAt    DateTime?
-  leads        Lead[]
-  jobs         Job[]
-  candidates   CampaignCandidate[]
-  seeds        CrawlSeed[]
+  id            String              @id @default(uuid())
+  name          String
+  criteria      Json
+  criteriaHash  String
+  criteriaWhere String?
+  createdAt     DateTime            @default(now())
+  active        Boolean             @default(true)
+  deletedAt     DateTime?
+  leads         Lead[]
+  jobs          Job[]
+  candidates    CampaignCandidate[]
+  seeds         CrawlSeed[]
 }
 
 model Lead {
@@ -98,6 +99,7 @@ model ProfileFeatures {
 
 enum SeedType {
   post
+  hashtag
 }
 
 model CrawlSeed {
