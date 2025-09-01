@@ -105,7 +105,7 @@ campaignsRouter.post('/:id/seeds', async (req, res, next) => {
   try {
     const { id } = req.params;
     const body = createSeedSchema.parse(req.body);
-    const created = await seeds.createSeed(id, 'post', body.value, body.enabled);
+    const created = await seeds.createSeed(id, body.type, body.value, body.enabled);
     res.json(created);
   } catch (err) {
     next(err);
