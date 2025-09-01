@@ -16,6 +16,11 @@ cd apps/api
 bun install
 bunx prisma generate
 bunx prisma migrate dev --name init
+# Optional: set up the Auth DB (separate schema and DB URL)
+bunx prisma migrate dev --schema prisma/auth/schema.prisma --name init_auth_session
+# Note: set AUTH_DATABASE_URL before running these, e.g.
+# export AUTH_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/omni_auth
+bunx prisma generate --schema prisma/auth/schema.prisma
 bun run dev & bun run queue:worker
 
 cd ../crawler

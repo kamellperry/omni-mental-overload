@@ -8,6 +8,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN bunx prisma generate
+# Generate Prisma clients for core DB and auth DB
+RUN bunx prisma generate \
+  && bunx prisma generate --schema prisma/auth/schema.prisma
 EXPOSE 3000
 CMD ["bun", "run", "dev"]

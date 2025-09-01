@@ -9,41 +9,43 @@ datasource db {
 }
 
 model Campaign {
-  id            String   @id @default(uuid())
-  name          String
-  criteria      Json
-  criteriaHash  String
-  createdAt     DateTime @default(now())
-  active        Boolean  @default(true)
-  deletedAt     DateTime?
-  leads         Lead[]
-  jobs          Job[]
-  candidates    CampaignCandidate[]
-  seeds         CrawlSeed[]
+  id           String              @id @default(uuid())
+  name         String
+  criteria     Json
+  criteriaHash String
+  createdAt    DateTime            @default(now())
+  active       Boolean             @default(true)
+  deletedAt    DateTime?
+  leads        Lead[]
+  jobs         Job[]
+  candidates   CampaignCandidate[]
+  seeds        CrawlSeed[]
 }
 
 model Lead {
-  campaignId   String
-  username     String
-  score        Int
-  qualified    Boolean
-  reasons      Json
-  qualifiedAt  DateTime @default(now())
-  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId  String
+  username    String
+  score       Int
+  qualified   Boolean
+  reasons     Json
+  qualifiedAt DateTime @default(now())
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
   @@id([campaignId, username])
   @@index([campaignId, score])
 }
 
 model Job {
-  id          String    @id @default(uuid())
-  campaignId  String?
-  type        String
-  status      String
-  key         String?
-  startedAt   DateTime?
-  finishedAt  DateTime?
-  errorText   String?
-  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  id         String    @id @default(uuid())
+  campaignId String?
+  type       String
+  status     String
+  key        String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  errorText  String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
   @@index([campaignId])
   @@index([status])
 }
@@ -54,6 +56,7 @@ model CampaignCandidate {
   candidateScoreCheap Int
   updatedAt           DateTime @updatedAt
   campaign            Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
   @@id([campaignId, username])
   @@index([campaignId, candidateScoreCheap])
 }
@@ -67,6 +70,7 @@ model LLMScore {
   confidence   Float
   reasons      Json
   createdAt    DateTime @default(now())
+
   @@id([campaignId, username, profileHash, criteriaHash])
   @@index([campaignId])
 }
@@ -80,7 +84,7 @@ model ProfileRaw {
 }
 
 model ProfileFeatures {
-  username         String   @id
+  username         String    @id
   followers        Int
   engagement       Float?
   lang             String?
@@ -89,7 +93,7 @@ model ProfileFeatures {
   recentActivityAt DateTime?
   features         Json
   versionHash      String
-  updatedAt        DateTime @updatedAt
+  updatedAt        DateTime  @updatedAt
 }
 
 enum SeedType {
@@ -105,7 +109,7 @@ model CrawlSeed {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@index([campaignId])
   @@index([enabled])

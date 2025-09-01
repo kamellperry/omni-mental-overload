@@ -12,7 +12,7 @@ install.frontend:
 # - Creates a local .venv in apps/crawler
 # - Installs project and dev dependencies from pyproject.toml
 install.backend:
-	cd $(BACKEND_DIR) && uv venv .venv && UV_VENV_IN_PROJECT=1 uv sync --dev
+	cd $(BACKEND_DIR) && uv venv && uv sync --dev
 
 # Setup all: frontend + backend
 setup: install.frontend install.backend
