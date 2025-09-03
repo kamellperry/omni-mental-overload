@@ -13,6 +13,23 @@ enum AuthStatus {
   revoked
 }
 
+model AuthAccount {
+  id                 String     @id @default(uuid())
+  platform           String
+  account            String
+  provider           String     @default("pydoll")
+  providerAccountId  String
+  credentials        Json
+  proxy              String
+  status             AuthStatus @default(active)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  sessions           AuthSession[]
+
+  @@unique([platform, account])
+}
+
 model AuthSession {
   id        String     @id @default(uuid())
   platform  String
@@ -26,8 +43,16 @@ model AuthSession {
   updatedAt DateTime   @updatedAt
   expiresAt DateTime
 
+  // Host-scoped sessions anchored to accounts
+  accountId         String?
+  proxy             String?
+  providerSessionId String?
+
+  authAccount AuthAccount? @relation(fields: [accountId], references: [id])
+
   @@index([platform, account, host])
   @@index([platform, account, host, status])
   @@index([expiresAt])
   @@index([account])
+  @@index([accountId])
 }

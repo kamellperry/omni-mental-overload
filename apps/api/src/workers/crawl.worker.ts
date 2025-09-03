@@ -4,14 +4,18 @@ import { fetchJson } from '../lib/http';
 import { z } from 'zod';
 import * as jobs from '../features/jobs/job.repo';
 import { listEnabled } from '../features/seeds/seed.repo';
+import { getActiveBundle, refreshBundle } from '../features/accounts/session.service';
 
 const base = process.env.CRAWLER_BASE_URL || 'http://localhost:8000';
 
+const hostEnum = z.enum(['www.instagram.com', 'i.instagram.com']);
 const payloadSchema = z.object({
   campaignId: z.string().min(1),
   seed_type: z.enum(['post', 'hashtag']),
   seed_value: z.string().min(1),
   crawl_config: z.object({ max_profiles: z.number().int().min(1).max(5000).default(500) }),
+  accountId: z.string().uuid().optional(),
+  host: hostEnum.optional(),
 });
 
 export function startCrawlWorker() {
@@ -42,13 +46,39 @@ export function startCrawlWorker() {
           const input = payloadSchema.parse(job.data);
           // Map orchestrator seed types to crawler's expectation (hashtag -> tag)
           const crawlerSeedType = input.seed_type === 'hashtag' ? 'tag' : input.seed_type;
+          // Attempt to fetch host-scoped headers from Account Manager
+          const accountId = input.accountId || process.env.AUTH_ACCOUNT_ID || '';
+          const host = input.host || process.env.AUTH_HOST || 'www.instagram.com';
+          let headers: Record<string, string> | undefined;
+          let proxy: string | undefined;
+          if (accountId) {
+            try {
+              const redis = getConnection();
+              const cached = await getActiveBundle(redis, accountId, host);
+              if (cached) {
+                headers = cached.headers;
+                proxy = cached.proxy ?? undefined;
+              } else {
+                const b = await refreshBundle(getConnection() as any, accountId, host, { force: true });
+                headers = b.headers;
+                proxy = b.proxy ?? undefined;
+              }
+            } catch {
+              // best-effort: proceed without headers if unavailable
+            }
+          }
           await fetchJson(`${base}/crawl/jobs`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
               seed_type: crawlerSeedType,
               seed_value: input.seed_value,
-              crawl_config: input.crawl_config,
+              crawl_config: {
+                ...input.crawl_config,
+                ...(headers ? { headers } : {}),
+                ...(proxy ? { proxy } : {}),
+                ...(headers ? { mode: 'real' } : {}),
+              },
             }),
             timeoutMs: 10000,
           });

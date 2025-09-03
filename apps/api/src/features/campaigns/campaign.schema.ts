@@ -13,12 +13,17 @@ export const createCampaignSchema = z.object({
 
 export type CreateCampaignInput = z.infer<typeof createCampaignSchema>;
 
+const hostEnum = z.enum(['www.instagram.com', 'i.instagram.com']);
+
 export const discoverSchema = z.object({
   seed_type: z.enum(['post', 'hashtag']).default('post'),
   seed_value: z.string(),
   crawl_config: z
     .object({ max_profiles: z.number().int().min(1).max(5000).default(500) })
     .default({ max_profiles: 500 }),
+  // Optional per-job account selection to avoid editing envs
+  accountId: z.string().uuid().optional(),
+  host: hostEnum.optional(),
 });
 
 export const qualifySchema = z

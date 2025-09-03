@@ -26,8 +26,8 @@ export * as $Enums from './enums'
  * @example
  * ```
  * const prisma = new PrismaClient()
- * // Fetch zero or more AuthSessions
- * const authSessions = await prisma.authSession.findMany()
+ * // Fetch zero or more AuthAccounts
+ * const authAccounts = await prisma.authAccount.findMany()
  * ```
  * 
  * Read more in our [docs](https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-client).
@@ -41,6 +41,11 @@ export { Prisma }
 path.join(__dirname, "libquery_engine-darwin-arm64.dylib.node")
 path.join(process.cwd(), "src/generated/auth/libquery_engine-darwin-arm64.dylib.node")
 
+/**
+ * Model AuthAccount
+ * 
+ */
+export type AuthAccount = Prisma.AuthAccountModel
 /**
  * Model AuthSession
  * 

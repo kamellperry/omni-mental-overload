@@ -7,5 +7,6 @@
  *
  * 🟢 You can import this file directly.
  */
+export type * from './models/AuthAccount'
 export type * from './models/AuthSession'
 export type * from './commonInputTypes'

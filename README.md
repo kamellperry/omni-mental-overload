@@ -39,6 +39,7 @@ docker compose up --build
 We are centralizing social auth/session in a dedicated Account Manager (PyDoll‑backed) while keeping the crawler stateless. The orchestrator fetches host‑ready headers (cookies + UA + platform tokens) once per crawl and injects them into `crawl_config.headers`. On rare expiry, the orchestrator asks the Account Manager to refresh and retries once. No public API or schema changes are required.
 
 - Plan: see `docs/account-manager-auth-plan.md` (goals, endpoints, flows, rollout).
+- Provider contract: see `docs/pydoll-bundle-contract.md` (expected response shape, required headers, proxy format).
 - Orchestrator integration (apps/api):
   - Add a small client to call the Account Manager (GET headers, POST refresh).
   - In the crawl worker, fetch headers → POST crawler `/crawl/jobs`; on `auth_expired`, refresh+retry.
