@@ -15,6 +15,9 @@ import {
 } from './session.schema';
 import type { AuthDB } from '../../db/auth-db';
 import * as repo from './session.repo';
+import * as accounts from './account.repo';
+import * as sessCache from './session.cache';
+import { refreshSession as pydollRefresh } from './pydoll.client';
 
 type Identity = z.infer<typeof getActiveSessionQuerySchema>;
 type CreateInput = z.infer<typeof createSessionSchema>;
@@ -154,3 +157,243 @@ export async function purgeExpired(deps: Deps): Promise<number> {
   return count;
 }
 
+// --- Host-scoped, accountId-based bundle serving ---
+
+const IG_HOSTS = new Set(['www.instagram.com', 'i.instagram.com']);
+
+export function assertValidHost(host: string): void {
+  if (!IG_HOSTS.has(host)) {
+    throw new Error('invalid_host');
+  }
+}
+
+export type SessionBundle = {
+  userAgent: string;
+  headers: Record<string, string>;
+  cookieJar: Record<string, unknown> | unknown[];
+  proxy?: string | null;
+  expiresAt: string; // ISO
+};
+
+function cookieHeaderFromJar(jar: Record<string, unknown> | unknown[]): string | null {
+  try {
+    if (Array.isArray(jar)) {
+      const parts: string[] = [];
+      for (const it of jar) {
+        if (it && typeof it === 'object' && 'name' in it && 'value' in it) {
+          const name = String((it as any).name);
+          const value = String((it as any).value);
+          if (name) parts.push(`${name}=${value}`);
+        }
+      }
+      return parts.length ? parts.join('; ') : null;
+    }
+    // object map form { name: value }
+    const parts = Object.entries(jar as Record<string, unknown>)
+      .filter(([k, v]) => typeof k === 'string' && typeof v === 'string')
+      .map(([k, v]) => `${k}=${String(v)}`);
+    return parts.length ? parts.join('; ') : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasHeader(headers: Record<string, string>, name: string): boolean {
+  const needle = name.toLowerCase();
+  for (const k of Object.keys(headers)) if (k.toLowerCase() === needle) return true;
+  return false;
+}
+
+function setHeader(headers: Record<string, string>, name: string, value: string): void {
+  // Preserve existing casing if present; else set with given name
+  const lower = name.toLowerCase();
+  for (const k of Object.keys(headers)) {
+    if (k.toLowerCase() === lower) {
+      headers[k] = value;
+      return;
+    }
+  }
+  headers[name] = value;
+}
+
+function enrichHeadersForHost(
+  host: string,
+  headers: Record<string, string>,
+  jar: Record<string, unknown> | unknown[],
+  userAgent: string,
+): Record<string, string> {
+  const out = { ...headers };
+
+  // Always ensure User-Agent is set to the session UA
+  if (!hasHeader(out, 'User-Agent')) setHeader(out, 'User-Agent', userAgent);
+
+  // Ensure Cookie exists (caller likely set this already from jar)
+  // Add X-CSRFToken if cookie present and header missing
+  try {
+    const cookie = cookieHeaderFromJar(jar);
+    if (cookie && !hasHeader(out, 'Cookie')) setHeader(out, 'Cookie', cookie);
+    if (!hasHeader(out, 'X-CSRFToken')) {
+      // lightweight parse for csrftoken
+      const parts = (cookie ?? '').split(';');
+      for (const p of parts) {
+        const [k, v] = p.trim().split('=');
+        if ((k || '').toLowerCase() === 'csrftoken' && v) {
+          setHeader(out, 'X-CSRFToken', v);
+          break;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // Web host defaults (www)
+  if (host === 'www.instagram.com') {
+    // Required/commonly used tokens
+    if (!hasHeader(out, 'x-ig-app-id')) setHeader(out, 'x-ig-app-id', '936619743392459');
+    if (!hasHeader(out, 'X-ASBD-ID')) setHeader(out, 'X-ASBD-ID', process.env.X_ASBD_ID || '359341');
+    // X-IG-WWW-Claim and X-Instagram-AJAX should come from provider; do not synthesize.
+
+    // Browsery headers for web XHR
+    if (!hasHeader(out, 'X-Requested-With')) setHeader(out, 'X-Requested-With', 'XMLHttpRequest');
+    if (!hasHeader(out, 'Origin')) setHeader(out, 'Origin', 'https://www.instagram.com');
+    if (!hasHeader(out, 'Referer')) setHeader(out, 'Referer', 'https://www.instagram.com/');
+    if (!hasHeader(out, 'Accept')) setHeader(out, 'Accept', '*/*');
+    if (!hasHeader(out, 'Accept-Language')) setHeader(out, 'Accept-Language', 'en-US,en;q=0.9');
+    if (!hasHeader(out, 'Accept-Encoding')) setHeader(out, 'Accept-Encoding', 'gzip, deflate, br');
+    if (!hasHeader(out, 'Connection')) setHeader(out, 'Connection', 'keep-alive');
+  }
+
+  // Mobile host (i.instagram.com): we intentionally do not inject web-only headers
+  return out;
+}
+
+function normalizeProxyURL(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const val = String(raw).trim();
+  if (!val) return null;
+  try {
+    const u = new URL(val);
+    if (u.protocol === 'http:' || u.protocol === 'https:') {
+      // Already a valid URL (standard form). Return as-is.
+      return u.toString();
+    }
+  } catch {
+    // fallthrough to vendor pattern
+  }
+  // Vendor pattern: scheme://host:port:user:password_with_suffix
+  const m = /^(https?:)\/\/([^:\/]+):(\d+):([^:]+):(.+)$/.exec(val);
+  if (m) {
+    const scheme = m[1];
+    const host = m[2];
+    const port = m[3];
+    const user = m[4];
+    const pass = m[5];
+    const auth = `${encodeURIComponent(user)}:${encodeURIComponent(pass)}`;
+    return `${scheme}//${auth}@${host}:${port}`;
+  }
+  // As a last resort, return the original string (caller may still handle it)
+  return val;
+}
+
+export async function getActiveBundle(
+  redis: IORedis,
+  accountId: string,
+  host: string,
+): Promise<SessionBundle | null> {
+  assertValidHost(host);
+  const cached = await sessCache.get(redis, accountId, host);
+  if (cached) return cached;
+  const rec = await repo.findActiveByAccountHost(accountId, host);
+  if (!rec) return null;
+  const headers = (rec.headers as Record<string, string>) || {};
+  const jar = (rec.cookieJar as Record<string, unknown> | unknown[]) || [];
+  const mergedHeaders = enrichHeadersForHost(host, headers, jar, rec.userAgent);
+  const bundle: SessionBundle = {
+    userAgent: rec.userAgent,
+    headers: mergedHeaders,
+    cookieJar: jar,
+    proxy: normalizeProxyURL(rec.proxy ?? null),
+    expiresAt: rec.expiresAt.toISOString(),
+  };
+  await sessCache.put(redis, accountId, host, bundle);
+  return bundle;
+}
+
+export async function refreshBundle(
+  redis: IORedis,
+  accountId: string,
+  host: string,
+  opts?: { force?: boolean },
+): Promise<SessionBundle> {
+  assertValidHost(host);
+  const acc = await accounts.findById(accountId);
+  if (!acc) throw new Error('account_not_found');
+  const bundle = await pydollRefresh(acc.providerAccountId, host, { force: opts?.force });
+  // Persist
+  const proxy = bundle.proxy ?? acc.proxy ?? null;
+  const normalizedProxy = normalizeProxyURL(proxy);
+  const expiresAt = new Date(bundle.expiresAt);
+  const created = await repo.createActiveForAccountHost({
+    accountId,
+    platform: acc.platform,
+    account: acc.account,
+    host,
+    userAgent: bundle.userAgent,
+    headers: bundle.headers,
+    cookieJar: bundle.cookieJar,
+    proxy: normalizedProxy,
+    providerSessionId: bundle.providerSessionId ?? null,
+    expiresAt,
+  });
+  // Build merged headers with required defaults for host
+  const mergedHeaders = enrichHeadersForHost(host, bundle.headers, bundle.cookieJar, bundle.userAgent);
+  const out: SessionBundle = {
+    userAgent: bundle.userAgent,
+    headers: mergedHeaders,
+    cookieJar: bundle.cookieJar,
+    proxy: normalizedProxy,
+    expiresAt: created.expiresAt.toISOString(),
+  };
+  await sessCache.put(redis, accountId, host, out);
+  return out;
+}
+
+export async function upsertManual(
+  redis: IORedis,
+  input: {
+    accountId: string;
+    platform: string;
+    account: string;
+    host: string;
+    userAgent: string;
+    headers: Record<string, string>;
+    cookieJar: Record<string, unknown> | unknown[];
+    proxy?: string | null;
+    expiresAt: Date;
+  },
+): Promise<SessionBundle> {
+  assertValidHost(input.host);
+  const created = await repo.createActiveForAccountHost({
+    accountId: input.accountId,
+    platform: input.platform,
+    account: input.account,
+    host: input.host,
+    userAgent: input.userAgent,
+    headers: input.headers,
+    cookieJar: input.cookieJar,
+    proxy: normalizeProxyURL(input.proxy ?? null),
+    expiresAt: input.expiresAt,
+    providerSessionId: null,
+  });
+  const mergedHeaders = enrichHeadersForHost(input.host, input.headers, input.cookieJar, input.userAgent);
+  const out: SessionBundle = {
+    userAgent: created.userAgent,
+    headers: mergedHeaders,
+    cookieJar: input.cookieJar,
+    proxy: normalizeProxyURL(input.proxy ?? null),
+    expiresAt: created.expiresAt.toISOString(),
+  };
+  await sessCache.put(redis, input.accountId, input.host, out);
+  return out;
+}

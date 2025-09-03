@@ -14,6 +14,9 @@ export type AuthSessionRecord = {
   createdAt: Date;
   updatedAt: Date;
   expiresAt: Date;
+  accountId?: string | null;
+  proxy?: string | null;
+  providerSessionId?: string | null;
 };
 
 export async function findActiveSession(identity: Identity): Promise<AuthSessionRecord | null> {
@@ -74,3 +77,53 @@ export async function purgeExpired(now: Date): Promise<number> {
   return res.count;
 }
 
+// New host-scoped helpers using accountId
+export async function findActiveByAccountHost(
+  accountId: string,
+  host: string,
+): Promise<AuthSessionRecord | null> {
+  const db = getAuthDb();
+  const rec = await db.authSession.findFirst({
+    where: { accountId, host, status: 'active' },
+    orderBy: { updatedAt: 'desc' },
+  });
+  return (rec as unknown as AuthSessionRecord) ?? null;
+}
+
+export async function createActiveForAccountHost(input: {
+  accountId: string;
+  platform: string;
+  account: string; // username
+  host: string;
+  userAgent: string;
+  headers: Record<string, string>;
+  cookieJar: Record<string, unknown> | unknown[];
+  proxy?: string | null;
+  providerSessionId?: string | null;
+  expiresAt: Date;
+}): Promise<AuthSessionRecord> {
+  const db = getAuthDb();
+  const rec = await db.$transaction(async (tx) => {
+    await tx.authSession.updateMany({
+      where: { accountId: input.accountId, host: input.host, status: 'active' },
+      data: { status: 'revoked' },
+    });
+    const created = await tx.authSession.create({
+      data: {
+        accountId: input.accountId,
+        platform: input.platform,
+        account: input.account,
+        host: input.host,
+        userAgent: input.userAgent,
+        headers: input.headers as unknown,
+        cookieJar: input.cookieJar as unknown,
+        proxy: input.proxy ?? undefined,
+        providerSessionId: input.providerSessionId ?? undefined,
+        status: 'active',
+        expiresAt: input.expiresAt,
+      },
+    });
+    return created as unknown as AuthSessionRecord;
+  });
+  return rec;
+}

@@ -394,6 +394,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 
 export const ModelName = {
+  AuthAccount: 'AuthAccount',
   AuthSession: 'AuthSession'
 } as const
 
@@ -410,10 +411,84 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "authSession"
+    modelProps: "authAccount" | "authSession"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
+    AuthAccount: {
+      payload: Prisma.$AuthAccountPayload<ExtArgs>
+      fields: Prisma.AuthAccountFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AuthAccountFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAccountPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AuthAccountFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAccountPayload>
+        }
+        findFirst: {
+          args: Prisma.AuthAccountFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAccountPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AuthAccountFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAccountPayload>
+        }
+        findMany: {
+          args: Prisma.AuthAccountFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAccountPayload>[]
+        }
+        create: {
+          args: Prisma.AuthAccountCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAccountPayload>
+        }
+        createMany: {
+          args: Prisma.AuthAccountCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AuthAccountCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAccountPayload>[]
+        }
+        delete: {
+          args: Prisma.AuthAccountDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAccountPayload>
+        }
+        update: {
+          args: Prisma.AuthAccountUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAccountPayload>
+        }
+        deleteMany: {
+          args: Prisma.AuthAccountDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AuthAccountUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AuthAccountUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAccountPayload>[]
+        }
+        upsert: {
+          args: Prisma.AuthAccountUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAccountPayload>
+        }
+        aggregate: {
+          args: Prisma.AuthAccountAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAuthAccount>
+        }
+        groupBy: {
+          args: Prisma.AuthAccountGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AuthAccountGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AuthAccountCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AuthAccountCountAggregateOutputType> | number
+        }
+      }
+    }
     AuthSession: {
       payload: Prisma.$AuthSessionPayload<ExtArgs>
       fields: Prisma.AuthSessionFieldRefs
@@ -527,6 +602,22 @@ export const TransactionIsolationLevel = runtime.makeStrictEnum({
 export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof typeof TransactionIsolationLevel]
 
 
+export const AuthAccountScalarFieldEnum = {
+  id: 'id',
+  platform: 'platform',
+  account: 'account',
+  provider: 'provider',
+  providerAccountId: 'providerAccountId',
+  credentials: 'credentials',
+  proxy: 'proxy',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AuthAccountScalarFieldEnum = (typeof AuthAccountScalarFieldEnum)[keyof typeof AuthAccountScalarFieldEnum]
+
+
 export const AuthSessionScalarFieldEnum = {
   id: 'id',
   platform: 'platform',
@@ -538,7 +629,10 @@ export const AuthSessionScalarFieldEnum = {
   status: 'status',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
-  expiresAt: 'expiresAt'
+  expiresAt: 'expiresAt',
+  accountId: 'accountId',
+  proxy: 'proxy',
+  providerSessionId: 'providerSessionId'
 } as const
 
 export type AuthSessionScalarFieldEnum = (typeof AuthSessionScalarFieldEnum)[keyof typeof AuthSessionScalarFieldEnum]
@@ -574,6 +668,14 @@ export const JsonNullValueFilter = {
 } as const
 
 export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
+
+
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 
 
 
@@ -734,6 +836,7 @@ export interface PrismaClientOptions {
   omit?: GlobalOmitConfig
 }
 export type GlobalOmitConfig = {
+  authAccount?: Prisma.AuthAccountOmit
   authSession?: Prisma.AuthSessionOmit
 }
 

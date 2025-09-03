@@ -62,6 +62,19 @@ services:
         ports: ['8000:8000']
         profiles: ['production']
 
+    pydoll:
+        build:
+            context: ./apps/pydoll-mock
+            dockerfile: Dockerfile
+        environment:
+            PYDOLL_AUTH_TOKEN: ${PYDOLL_AUTH_TOKEN:-devtoken}
+        ports: ['8080:8080']
+        healthcheck:
+            test: ['CMD-SHELL', 'curl -fsS http://localhost:8080/health >/dev/null || exit 1']
+            interval: 5s
+            timeout: 3s
+            retries: 30
+
     pgweb:
         image: sosedoff/pgweb:latest
         container_name: omni-pgweb-dev

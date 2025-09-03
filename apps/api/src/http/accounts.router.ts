@@ -14,6 +14,11 @@ import {
   getActiveSessionQuerySchema,
   revokeSessionSchema,
 } from '../features/accounts/session.schema';
+import { createAccountSchema, updateAccountSchema } from '../features/accounts/account.schema';
+import * as accountRepo from '../features/accounts/account.repo';
+import { getActiveBundle, refreshBundle, upsertManual } from '../features/accounts/session.service';
+import { onboardAccount } from '../features/accounts/onboard.service';
+import { onboardAccountSchema } from '../features/accounts/onboard.schema';
 
 const router = Router();
 
@@ -56,7 +61,7 @@ router.post('/sessions', async (req, res, next) => {
   }
 });
 
-router.get('/sessions', async (req, res, next) => {
+router.get('/sessions/by-account-id', async (req, res, next) => {
   try {
     requireBearer(req);
     const query = getActiveSessionQuerySchema.parse(req.query ?? {});
@@ -115,3 +120,85 @@ router.delete('/sessions/purge-expired', async (req, res, next) => {
 
 export const accountsRouter = router;
 
+// --- Host-scoped Account Manager endpoints (internal) ---
+
+router.post('/', async (req, res, next) => {
+  try {
+    requireBearer(req);
+    const input = createAccountSchema.parse(req.body ?? {});
+    const rec = await accountRepo.createAccount(input);
+    res.status(201).json({ id: rec.id, platform: rec.platform, account: rec.account, provider: rec.provider, providerAccountId: rec.providerAccountId, proxy: rec.proxy, status: rec.status, createdAt: rec.createdAt, updatedAt: rec.updatedAt });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/onboard', async (req, res, next) => {
+  try {
+    requireBearer(req);
+    const payload = onboardAccountSchema.parse(req.body ?? {});
+    const out = await onboardAccount({ redis: redis() }, payload);
+    res.status(201).json(out);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/:id', async (req, res, next) => {
+  try {
+    requireBearer(req);
+    const input = updateAccountSchema.parse(req.body ?? {});
+    const rec = await accountRepo.updateAccount(req.params.id, input);
+    res.json({ id: rec.id, platform: rec.platform, account: rec.account, provider: rec.provider, providerAccountId: rec.providerAccountId, proxy: rec.proxy, status: rec.status, createdAt: rec.createdAt, updatedAt: rec.updatedAt });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/refresh', async (req, res, next) => {
+  try {
+    requireBearer(req);
+    const accountId = req.params.id;
+    const host = String(req.query.host || 'www.instagram.com');
+    const force = String(req.query.force || '').toLowerCase() === 'true';
+    const bundle = await refreshBundle(redis(), accountId, host, { force });
+    res.json(bundle);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/sessions', async (req, res, next) => {
+  try {
+    requireBearer(req);
+    const accountId = String(req.query.accountId || '');
+    const host = String(req.query.host || '');
+    if (!accountId || !host) throw new AppError('bad_request', 'accountId and host are required', 400);
+    const bundle = await getActiveBundle(redis(), accountId, host);
+    if (!bundle) return res.status(404).json({ error: 'not_found' });
+    res.json(bundle);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/sessions/manual', async (req, res, next) => {
+  try {
+    requireBearer(req);
+    const body = req.body ?? {};
+    const out = await upsertManual(redis(), {
+      accountId: String(body.accountId),
+      platform: String(body.platform || 'instagram'),
+      account: String(body.account),
+      host: String(body.host),
+      userAgent: String(body.userAgent),
+      headers: (body.headers ?? {}) as Record<string, string>,
+      cookieJar: (body.cookieJar ?? {}) as Record<string, unknown> | unknown[],
+      proxy: (body.proxy as string | undefined) ?? null,
+      expiresAt: new Date(String(body.expiresAt)),
+    });
+    res.status(201).json(out);
+  } catch (err) {
+    next(err);
+  }
+});
